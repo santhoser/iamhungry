@@ -1,0 +1,16 @@
+{
+  "name": "Cafe77",
+  "tagline": "From the house of Cake Dew",
+  "address": "",
+  "phone": "",
+  "gstin": "",
+  "gstRate": 10,
+  "gstInclusive": true,
+  "currency": "INR",
+  "timezone": "Asia/Kolkata",
+  "logo": "/cafe77-logo.jpg",
+  "qrBaseUrl": "http://localhost:5173/",
+  "menuCodeSearch": true,
+  "upiEnabled": false,
+  "receiptFooter": "Thank you for visiting Cafe77. See you again soon!"
+}
