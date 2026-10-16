@@ -134,7 +134,9 @@ test("mobile table checkout through staff payment, receipt and close", async ({
     .first()
     .getAttribute("href");
   const url = new URL(href!);
-  url.host = "127.0.0.1:5174";
+  const fixtureOrigin = new URL(admin.url());
+  url.host = fixtureOrigin.host;
+  url.protocol = fixtureOrigin.protocol;
   const customerContext = await browser.newContext({
     viewport: { width: 390, height: 844 },
     isMobile: true,
@@ -220,7 +222,14 @@ test("mobile table checkout through staff payment, receipt and close", async ({
     customer.getByRole("dialog", { name: "Payment receipt" }),
   ).toBeVisible();
   await expect(
-    customer.getByText("GST 10% (included)", { exact: true }),
+    customer
+      .getByRole("dialog", { name: "Payment receipt" })
+      .getByText("CGST 2.5% (included)", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    customer
+      .getByRole("dialog", { name: "Payment receipt" })
+      .getByText("SGST 2.5% (included)", { exact: true }),
   ).toBeVisible();
   await customer.emulateMedia({ media: "print" });
   await expect(customer.locator(".receipt-paper")).toBeVisible();
@@ -313,4 +322,87 @@ test("cashier stock controls and narrow staff layout", async ({ browser }) => {
     fullPage: true,
   });
   await ctx.close();
+});
+
+test("counter order, customer conversation, and Excel history export", async ({
+  browser,
+}) => {
+  const staff = await browser.newContext();
+  const admin = await staff.newPage();
+  await admin.goto("/admin");
+  await admin.getByLabel("Username", { exact: true }).fill("reviewcashier");
+  await admin
+    .getByLabel("Password", { exact: true })
+    .fill("Cashier-Test-Password-42");
+  await admin.getByRole("button", { name: "Sign in", exact: true }).click();
+  await admin.getByRole("button", { name: "Add order" }).click();
+  const dialog = admin.getByRole("dialog", { name: "Add counter order" });
+  await dialog.getByLabel("Customer name").fill("Counter guest");
+  await expect(
+    dialog.getByRole("heading", { name: "Today's picks" }),
+  ).toBeVisible();
+  await expect(
+    dialog.getByRole("heading", { name: "Dashboard favourites" }),
+  ).toBeVisible();
+  await dialog
+    .locator(".counter-quick-picks")
+    .filter({ hasText: "Today's picks" })
+    .getByRole("button", { name: "Add Filter coffee" })
+    .click();
+  await dialog.getByLabel("Find item by code or name").fill("C01");
+  await expect(
+    dialog
+      .getByRole("listbox", { name: "Matching menu items" })
+      .getByRole("button", { name: "Add Filter coffee" }),
+  ).toBeVisible();
+  await dialog.getByLabel("Find item by code or name").press("Enter");
+  await expect(
+    dialog
+      .locator(".counter-selected-row")
+      .filter({ hasText: "Filter coffee" })
+      .locator("b"),
+  ).toHaveText("2");
+  const orderResponse = admin.waitForResponse(
+    (response) =>
+      response.url().endsWith("/api/admin/orders") &&
+      response.request().method() === "POST",
+  );
+  await dialog.getByRole("button", { name: "Create order" }).click();
+  const created = await (await orderResponse).json();
+  expect(created.order.tableNumber).toBe(1);
+  await expect(
+    admin.getByRole("dialog", { name: `Order ${created.order.number}` }),
+  ).toBeVisible();
+  await admin.getByRole("button", { name: "Close order" }).click();
+  const customer = await browser.newPage();
+  await customer.goto(`/order/${created.token}`);
+  await customer.getByLabel("Message to counter").fill("Please make it hot");
+  await customer.getByRole("button", { name: "Send message" }).click();
+  const row = admin.locator(".order-row").filter({ hasText: "Counter guest" });
+  await expect(row).toHaveClass(/has-unread-message/, { timeout: 10000 });
+  await expect(row.locator(".unread-message-icon")).toBeVisible();
+  await row.click();
+  await expect(admin.getByText("Please make it hot")).toBeVisible({
+    timeout: 10000,
+  });
+  await expect(row).not.toHaveClass(/has-unread-message/, { timeout: 10000 });
+  await admin.getByLabel("Reply to customer").fill("Sure, coming up");
+  await admin.getByRole("button", { name: "Send message" }).click();
+  await expect(customer.getByText("Sure, coming up")).toBeVisible({
+    timeout: 10000,
+  });
+  await customer.getByRole("button", { name: "1 unread messages" }).click();
+  await expect(
+    customer.getByRole("button", { name: "1 unread messages" }),
+  ).toHaveCount(0);
+  await expect(customer.locator(".messages")).toBeInViewport();
+  await admin.getByRole("button", { name: "Close order" }).click();
+  await admin
+    .getByRole("button", { name: "Order history", exact: true })
+    .click();
+  const download = admin.waitForEvent("download");
+  await admin.getByRole("button", { name: "Export to Excel" }).click();
+  expect((await download).suggestedFilename()).toMatch(/\.xlsx$/);
+  await customer.close();
+  await staff.close();
 });

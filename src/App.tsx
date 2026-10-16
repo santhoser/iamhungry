@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import TaxLines from "./TaxLines";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
   ChevronRight,
@@ -15,6 +16,7 @@ import {
   UtensilsCrossed,
   ArrowLeft,
   RefreshCw,
+  MessageCircle,
 } from "lucide-react";
 import { api } from "./api";
 import {
@@ -148,7 +150,8 @@ function Menu() {
   const count = lines.reduce((s, l) => s + l.quantity, 0);
   const amounts = totals(
     lines.map((l) => ({ price: l.item?.price || 0, quantity: l.quantity })),
-    config.gstRate,
+    config.cgstRate,
+    config.sgstRate,
     config.gstInclusive,
   );
   const filtered = items.filter(
@@ -367,8 +370,8 @@ function Menu() {
           </div>
           <p className="tax-note">
             {config.gstInclusive
-              ? `Prices include ${config.gstRate}% GST`
-              : `${config.gstRate}% GST is added at checkout`}
+              ? `Prices include CGST ${config.cgstRate}% + SGST ${config.sgstRate}%`
+              : `CGST ${config.cgstRate}% + SGST ${config.sgstRate}% added at checkout`}
           </p>
           {filtered.length ? (
             groups
@@ -449,6 +452,16 @@ function Menu() {
               </span>
               <h2>{detail.name}</h2>
               <p>{detail.details}</p>
+              {detail.calories && (
+                <p>
+                  <strong>Calories / nutrition:</strong> {detail.calories}
+                </p>
+              )}
+              {detail.ingredients && (
+                <p>
+                  <strong>Ingredients:</strong> {detail.ingredients}
+                </p>
+              )}
               {detail.images.slice(1).map((url) => (
                 <img
                   className="detail-extra"
@@ -555,13 +568,7 @@ function Menu() {
                     <span>Taxable amount</span>
                     <span>{money(amounts.taxable)}</span>
                   </div>
-                  <div>
-                    <span>
-                      GST ({config.gstRate}%
-                      {config.gstInclusive ? ", included" : ""})
-                    </span>
-                    <span>{money(amounts.gst)}</span>
-                  </div>
+                  <TaxLines restaurant={config} amounts={amounts} />
                   <div className="bill-total">
                     <strong>Total</strong>
                     <strong>{money(amounts.total)}</strong>
@@ -662,6 +669,10 @@ function Tracking({ token }: { token: string }) {
   const [order, setOrder] = useState<Order | null>(null);
   const [error, setError] = useState("");
   const [receipt, setReceipt] = useState(false);
+  const [messageText, setMessageText] = useState("");
+  const [sending, setSending] = useState(false);
+  const [reading, setReading] = useState(false);
+  const messageSectionRef = useRef<HTMLElement>(null);
   useEffect(() => {
     let alive = true;
     const load = () =>
@@ -692,12 +703,46 @@ function Tracking({ token }: { token: string }) {
   const steps = ["New", "Accepted", "InProgress", "Ready", "Closed"];
   const index = steps.indexOf(order.status);
   const paid = order.paid - order.refunded >= order.amounts.total;
+  const unreadMessages = order.messages.filter(
+    (message) => message.sender === "staff" && !message.readAt,
+  ).length;
   return (
     <>
       <header className="public-header">
         <div className="wrap header-inner">
           <Brand config={order.restaurant} />
           <span className="table-pill">Table {order.tableNumber}</span>
+          {unreadMessages > 0 && (
+            <button
+              className="customer-message-alert unread-message-icon"
+              aria-label={`${unreadMessages} unread messages`}
+              disabled={reading}
+              onClick={async () => {
+                messageSectionRef.current?.scrollIntoView({
+                  behavior: "smooth",
+                  block: "start",
+                });
+                setReading(true);
+                try {
+                  await api(
+                    `/orders/${encodeURIComponent(token)}/messages/read`,
+                    "POST",
+                    {},
+                  );
+                  setOrder(
+                    await api<Order>(`/orders/${encodeURIComponent(token)}`),
+                  );
+                } catch (e) {
+                  setError((e as Error).message);
+                } finally {
+                  setReading(false);
+                }
+              }}
+            >
+              <MessageCircle size={20} />
+              <span>{unreadMessages}</span>
+            </button>
+          )}
         </div>
       </header>
       <main className="tracking wrap">
@@ -769,15 +814,74 @@ function Tracking({ token }: { token: string }) {
               <span>Taxable amount</span>
               <span>{money(order.amounts.taxable)}</span>
             </div>
-            <div>
-              <span>GST ({order.restaurant.gstRate}%)</span>
-              <span>{money(order.amounts.gst)}</span>
-            </div>
+            <TaxLines restaurant={order.restaurant} amounts={order.amounts} />
             <div className="bill-total">
               <strong>Total</strong>
               <strong>{money(order.amounts.total)}</strong>
             </div>
           </div>
+          <section className="messages" ref={messageSectionRef}>
+            <h2>Messages</h2>
+            <div className="message-list">
+              {order.messages.length ? (
+                order.messages.map((message) => (
+                  <div
+                    className={`message message-${message.sender}`}
+                    key={message.id}
+                  >
+                    <strong>
+                      {message.sender === "staff" ? "Cafe77 team" : "You"}
+                    </strong>
+                    <p>{message.text}</p>
+                    <small>{indianTime(message.at)}</small>
+                  </div>
+                ))
+              ) : (
+                <p className="muted">
+                  Need anything? Send the counter a message.
+                </p>
+              )}
+            </div>
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setSending(true);
+                setError("");
+                try {
+                  await api(
+                    `/orders/${encodeURIComponent(token)}/messages`,
+                    "POST",
+                    { text: messageText },
+                  );
+                  setMessageText("");
+                  setOrder(
+                    await api<Order>(`/orders/${encodeURIComponent(token)}`),
+                  );
+                } catch (e) {
+                  setError((e as Error).message);
+                } finally {
+                  setSending(false);
+                }
+              }}
+            >
+              <label className="field">
+                Message to counter
+                <textarea
+                  required
+                  rows={2}
+                  maxLength={1000}
+                  value={messageText}
+                  onChange={(e) => setMessageText(e.target.value)}
+                />
+              </label>
+              <button
+                className="btn secondary"
+                disabled={sending || !messageText.trim()}
+              >
+                Send message
+              </button>
+            </form>
+          </section>
           {order.status === "Cancelled" && order.paid > order.refunded && (
             <p className="alert">
               Payment is recorded. Contact the counter about your refund.
@@ -849,13 +953,7 @@ export function Receipt({
               <span>Taxable amount</span>
               <span>{money(order.amounts.taxable)}</span>
             </div>
-            <div>
-              <span>
-                GST {order.restaurant.gstRate}%{" "}
-                {order.restaurant.gstInclusive ? "(included)" : ""}
-              </span>
-              <span>{money(order.amounts.gst)}</span>
-            </div>
+            <TaxLines restaurant={order.restaurant} amounts={order.amounts} />
             <div className="bill-total">
               <strong>Total</strong>
               <strong>{money(order.amounts.total)}</strong>

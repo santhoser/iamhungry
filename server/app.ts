@@ -57,6 +57,10 @@ const menuSchema = z.object({
   name: z.string().trim().min(1).max(100),
   price: z.number().int().min(0).max(10000000),
   details: z.string().max(2000).default(""),
+  calories: z.string().max(500).default(""),
+  showCalories: z.boolean().default(false),
+  ingredients: z.string().max(2000).default(""),
+  showIngredients: z.boolean().default(false),
   images: z.array(safeImage).max(6).default([]),
   video: z
     .string()
@@ -78,11 +82,22 @@ const configSchema = z.object({
   address: z.string().max(300),
   phone: z.string().max(30),
   gstin: z.string().max(20),
-  gstRate: z
+  cgstRate: z
     .number()
     .min(0)
     .max(100)
-    .refine((n) => Number.isInteger(n * 100), "Use at most two decimal places"),
+    .refine(
+      (n) => Math.abs(n * 100 - Math.round(n * 100)) < 1e-8,
+      "Use at most two decimal places",
+    ),
+  sgstRate: z
+    .number()
+    .min(0)
+    .max(100)
+    .refine(
+      (n) => Math.abs(n * 100 - Math.round(n * 100)) < 1e-8,
+      "Use at most two decimal places",
+    ),
   gstInclusive: z.boolean(),
   currency: z.literal("INR"),
   timezone: z.literal("Asia/Kolkata"),
@@ -105,6 +120,10 @@ function item(row: any): MenuItem {
     name: row.name,
     price: row.price,
     details: row.details,
+    calories: row.calories,
+    showCalories: !!row.show_calories,
+    ingredients: row.ingredients,
+    showIngredients: !!row.show_ingredients,
     images: JSON.parse(row.images),
     video: row.video,
     active: !!row.active,
@@ -240,6 +259,7 @@ export function createApp(
     return {
       id: row.id,
       number: row.number,
+      trackingToken: row.token,
       tableNumber: row.table_number,
       name: row.name,
       email: row.email,
@@ -267,6 +287,11 @@ export function createApp(
         )
         .all(id) as unknown as Order["events"],
       payments,
+      messages: db
+        .prepare(
+          "SELECT id,sender,text,at,read_at AS readAt FROM order_messages WHERE order_id=? ORDER BY id",
+        )
+        .all(id) as Order["messages"],
     };
   }
   const idParam = (req: Request) =>
@@ -322,13 +347,21 @@ export function createApp(
           "SELECT m.* FROM menu m JOIN groups g ON g.id=m.group_id WHERE m.active=1 AND g.active=1 AND m.deleted_at IS NULL AND g.deleted_at IS NULL ORDER BY m.id",
         )
         .all()
-        .map(item),
+        .map(item)
+        .map((m: MenuItem) => ({
+          ...m,
+          calories: m.showCalories ? m.calories : "",
+          ingredients: m.showIngredients ? m.ingredients : "",
+        })),
     });
   });
-  app.post("/api/orders", (req, res) => {
+  const createOrder = (req: Request, res: Response, counter = false) => {
+    const actor = counter ? staff(req).username : "Customer";
     const input = z
       .object({
-        table: z.string().min(1).max(100),
+        table: counter
+          ? z.number().int().min(1).max(999)
+          : z.string().min(1).max(100),
         name: z.string().trim().min(1).max(80),
         email: z
           .union([z.string().email().max(150), z.literal("")])
@@ -362,10 +395,16 @@ export function createApp(
     const result = transaction(db, () => {
       const table: any = db
         .prepare(
-          "SELECT id FROM tables WHERE token=? AND active=1 AND deleted_at IS NULL",
+          `SELECT id FROM tables WHERE ${counter ? "number" : "token"}=? AND active=1 AND deleted_at IS NULL`,
         )
         .get(input.table);
-      if (!table) fail(400, "Please scan a valid table QR before ordering");
+      if (!table)
+        fail(
+          400,
+          counter
+            ? "Choose an active table"
+            : "Please scan a valid table QR before ordering",
+        );
       if (new Set(input.items.map((x) => x.id)).size !== input.items.length)
         fail(400, "Duplicate menu items");
       const lines = input.items.map((x) => {
@@ -384,7 +423,12 @@ export function createApp(
         };
       });
       const cfg = publicConfig();
-      const amounts = totals(lines, cfg.gstRate, cfg.gstInclusive);
+      const amounts = totals(
+        lines,
+        cfg.cgstRate,
+        cfg.sgstRate,
+        cfg.gstInclusive,
+      );
       const token = randomBytes(24).toString("hex");
       const placedAt = new Date();
       let number = generateOrderNumber(placedAt);
@@ -418,11 +462,14 @@ export function createApp(
         ).run(id, line.itemId, line.code, line.name, line.price, line.quantity);
       db.prepare(
         "INSERT INTO events(order_id,status,actor,at) VALUES(?,?,?,?)",
-      ).run(id, "New", "Customer", now);
+      ).run(id, "New", actor, now);
+      if (counter) audit(actor, "order.counter.create", { id });
       return { token, order: getOrder(id) };
     });
     res.status(201).json(result);
-  });
+  };
+  app.post("/api/orders", (req, res) => createOrder(req, res));
+  app.post("/api/admin/orders", (req, res) => createOrder(req, res, true));
   app.get("/api/orders/:token", (req, res) => {
     const row: any = db
       .prepare("SELECT id FROM orders WHERE token=?")
@@ -437,6 +484,30 @@ export function createApp(
       })),
       payments: order.payments.map((p) => ({ ...p, actor: "Cafe77 team" })),
     });
+  });
+  app.post("/api/orders/:token/messages", (req, res) => {
+    const row: any = db
+      .prepare("SELECT id FROM orders WHERE token=?")
+      .get(req.params.token);
+    if (!row) fail(404, "Order not found");
+    const { text } = z
+      .object({ text: z.string().trim().min(1).max(1000) })
+      .parse(req.body);
+    const at = new Date().toISOString();
+    db.prepare(
+      "INSERT INTO order_messages(order_id,sender,text,at) VALUES(?,?,?,?)",
+    ).run(row.id, "customer", text, at);
+    res.status(201).json({ ok: true });
+  });
+  app.post("/api/orders/:token/messages/read", (req, res) => {
+    const row: any = db
+      .prepare("SELECT id FROM orders WHERE token=?")
+      .get(req.params.token);
+    if (!row) fail(404, "Order not found");
+    db.prepare(
+      "UPDATE order_messages SET read_at=? WHERE order_id=? AND sender='staff' AND read_at IS NULL",
+    ).run(new Date().toISOString(), row.id);
+    res.json({ ok: true });
   });
   app.get("/api/auth/me", (req, res) => res.json(staff(req)));
   app.post("/api/auth/login", (req, res) => {
@@ -544,6 +615,10 @@ export function createApp(
       m.name,
       m.price,
       m.details,
+      m.calories,
+      +m.showCalories,
+      m.ingredients,
+      +m.showIngredients,
       JSON.stringify(m.images),
       m.video,
       +m.active,
@@ -555,14 +630,14 @@ export function createApp(
       if (
         !db
           .prepare(
-            "UPDATE menu SET group_id=?,code=?,name=?,price=?,details=?,images=?,video=?,active=?,ran_out=?,today_special=?,dashboard_fav=? WHERE id=? AND deleted_at IS NULL",
+            "UPDATE menu SET group_id=?,code=?,name=?,price=?,details=?,calories=?,show_calories=?,ingredients=?,show_ingredients=?,images=?,video=?,active=?,ran_out=?,today_special=?,dashboard_fav=? WHERE id=? AND deleted_at IS NULL",
           )
           .run(...values, idParam(req)).changes
       )
         fail(404, "Item not found");
     } else {
       db.prepare(
-        "INSERT INTO menu(group_id,code,name,price,details,images,video,active,ran_out,today_special,dashboard_fav) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO menu(group_id,code,name,price,details,calories,show_calories,ingredients,show_ingredients,images,video,active,ran_out,today_special,dashboard_fav) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
       ).run(...values);
     }
     audit(u.username, "menu.save", { id: req.params.id, code: m.code });
@@ -682,6 +757,30 @@ export function createApp(
   app.get("/api/admin/orders/:id", (req, res) => {
     staff(req);
     res.json(getOrder(idParam(req)));
+  });
+  app.post("/api/admin/orders/:id/messages", (req, res) => {
+    const u = staff(req);
+    const id = idParam(req);
+    const { text } = z
+      .object({ text: z.string().trim().min(1).max(1000) })
+      .parse(req.body);
+    if (!db.prepare("SELECT id FROM orders WHERE id=?").get(id))
+      fail(404, "Order not found");
+    db.prepare(
+      "INSERT INTO order_messages(order_id,sender,text,at) VALUES(?,?,?,?)",
+    ).run(id, "staff", text, new Date().toISOString());
+    audit(u.username, "order.message", { id });
+    res.status(201).json({ ok: true });
+  });
+  app.post("/api/admin/orders/:id/messages/read", (req, res) => {
+    staff(req);
+    const id = idParam(req);
+    if (!db.prepare("SELECT id FROM orders WHERE id=?").get(id))
+      fail(404, "Order not found");
+    db.prepare(
+      "UPDATE order_messages SET read_at=? WHERE order_id=? AND sender='customer' AND read_at IS NULL",
+    ).run(new Date().toISOString(), id);
+    res.json({ ok: true });
   });
   app.post("/api/admin/orders/:id/status", (req, res) => {
     const u = staff(req);

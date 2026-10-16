@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import TaxLines from "./TaxLines";
+import { useEffect, useRef, useState } from "react";
 import {
   LayoutDashboard,
   ClipboardList,
@@ -9,6 +10,7 @@ import {
   Users,
   LogOut,
   Plus,
+  Minus,
   Check,
   X,
   ArrowRight,
@@ -22,9 +24,12 @@ import {
   IndianRupee,
   ShoppingBag,
   Clock,
+  MessageCircle,
+  Download,
 } from "lucide-react";
 import QRCode from "qrcode";
 import { api } from "./api";
+import { exportHistory } from "./export-orders";
 import { Brand, Receipt, indianTime } from "./App";
 import ConfirmDialog, { type Confirmation } from "./ConfirmDialog";
 import {
@@ -48,6 +53,10 @@ const blankItem: MenuItem = {
   name: "",
   price: 0,
   details: "",
+  calories: "",
+  showCalories: false,
+  ingredients: "",
+  showIngredients: false,
   images: [],
   video: "",
   active: true,
@@ -133,6 +142,45 @@ export default function Admin() {
   const [range, setRange] = useState(presetRange("today"));
   const [preset, setPreset] = useState("today");
   const [selected, setSelected] = useState<Order | null>(null);
+  const [counterOpen, setCounterOpen] = useState(false);
+  const [counter, setCounter] = useState({
+    table: 1,
+    name: "",
+    email: "",
+    phone: "",
+  });
+  const [counterItems, setCounterItems] = useState<Record<number, number>>({});
+  const [counterRequestKey, setCounterRequestKey] = useState(() =>
+    crypto.randomUUID(),
+  );
+  const [counterMenu, setCounterMenu] = useState<MenuItem[]>([]);
+  const [counterSearch, setCounterSearch] = useState("");
+  const counterSearchRef = useRef<HTMLInputElement>(null);
+  const counterMatches = counterSearch.trim()
+    ? counterMenu
+        .filter((item) =>
+          `${item.code} ${item.name}`
+            .toLowerCase()
+            .includes(counterSearch.trim().toLowerCase()),
+        )
+        .sort(
+          (a, b) =>
+            Number(
+              b.code.toLowerCase() === counterSearch.trim().toLowerCase(),
+            ) -
+            Number(a.code.toLowerCase() === counterSearch.trim().toLowerCase()),
+        )
+        .slice(0, 10)
+    : [];
+  const [messageText, setMessageText] = useState("");
+  const addCounterItem = (id: number) => {
+    setCounterItems((items) => ({
+      ...items,
+      [id]: Math.min(50, (items[id] || 0) + 1),
+    }));
+    setCounterSearch("");
+    counterSearchRef.current?.focus();
+  };
   const [reason, setReason] = useState("");
   const [receipt, setReceipt] = useState<Order | null>(null);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
@@ -221,13 +269,27 @@ export default function Admin() {
   useEffect(() => {
     if (!selected) return;
     let alive = true;
-    const timer = setInterval(
-      () =>
-        api<Order>("/admin/orders/" + selected.id)
-          .then((o) => alive && setSelected(o))
-          .catch((e) => alive && setError(e.message)),
-      5000,
-    );
+    const id = selected.id;
+    const refresh = async () => {
+      try {
+        let order = await api<Order>("/admin/orders/" + id);
+        if (!alive) return;
+        if (
+          order.messages.some(
+            (message) => message.sender === "customer" && !message.readAt,
+          )
+        ) {
+          await api(`/admin/orders/${id}/messages/read`, "POST", {});
+          order = await api<Order>("/admin/orders/" + id);
+          await load();
+        }
+        if (alive) setSelected(order);
+      } catch (e) {
+        if (alive) setError((e as Error).message);
+      }
+    };
+    refresh();
+    const timer = setInterval(refresh, 5000);
     return () => {
       alive = false;
       clearInterval(timer);
@@ -655,6 +717,18 @@ export default function Admin() {
                       }}
                     />
                   </label>
+                  <button
+                    className="btn secondary"
+                    onClick={() =>
+                      run(
+                        () => exportHistory(range, query),
+                        "Excel export downloaded",
+                      )
+                    }
+                    disabled={busy}
+                  >
+                    <Download size={16} /> Export to Excel
+                  </button>
                 </div>
               )}
               <div className="list-heading">
@@ -662,16 +736,42 @@ export default function Admin() {
                   {total} {tab === "orders" ? "current" : "matching"} orders
                 </span>
                 {tab === "orders" && (
-                  <span className="live-note">
-                    <span /> Updates every 5 seconds
-                  </span>
+                  <div className="list-actions">
+                    <span className="live-note">
+                      <span /> Updates every 5 seconds
+                    </span>
+                    <button
+                      className="btn"
+                      onClick={() =>
+                        run(async () => {
+                          const d = await api("/admin/menu");
+                          setCounterMenu(
+                            d.items.filter(
+                              (i: MenuItem) => i.active && !i.ranOut,
+                            ),
+                          );
+                          setCounterOpen(true);
+                        })
+                      }
+                      disabled={busy}
+                    >
+                      <Plus size={17} /> Add order
+                    </button>
+                  </div>
                 )}
               </div>
               {orders.length ? (
                 <div className="order-list">
                   {orders.map((o) => (
                     <button
-                      className="order-row"
+                      className={
+                        "order-row" +
+                        (o.messages.some(
+                          (m) => m.sender === "customer" && !m.readAt,
+                        )
+                          ? " has-unread-message"
+                          : "")
+                      }
                       key={o.id}
                       onClick={() => {
                         setSelected(o);
@@ -709,6 +809,20 @@ export default function Admin() {
                       <span className={"status status-" + o.status}>
                         {statusLabel(o.status)}
                       </span>
+                      {o.messages.length > 0 && (
+                        <span
+                          className={
+                            o.messages.some(
+                              (m) => m.sender === "customer" && !m.readAt,
+                            )
+                              ? "unread-message-icon"
+                              : ""
+                          }
+                          title={`${o.messages.length} messages`}
+                        >
+                          <MessageCircle size={18} /> {o.messages.length}
+                        </span>
+                      )}
                       <ChevronRight size={17} />
                     </button>
                   ))}
@@ -1070,17 +1184,32 @@ export default function Admin() {
               </div>
               <h3>Pricing & ordering</h3>
               <div className="form-grid">
-                <Field label="GST rate (%)">
+                <Field label="CGST rate (%)">
                   <input
                     type="number"
                     min={0}
                     max={100}
                     step="0.01"
                     required
-                    value={config.gstRate}
+                    value={config.cgstRate}
                     onChange={(e) =>
                       setConfig((c) =>
-                        c ? { ...c, gstRate: Number(e.target.value) } : c,
+                        c ? { ...c, cgstRate: Number(e.target.value) } : c,
+                      )
+                    }
+                  />
+                </Field>
+                <Field label="SGST rate (%)">
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    step="0.01"
+                    required
+                    value={config.sgstRate}
+                    onChange={(e) =>
+                      setConfig((c) =>
+                        c ? { ...c, sgstRate: Number(e.target.value) } : c,
                       )
                     }
                   />
@@ -1099,7 +1228,7 @@ export default function Admin() {
                 </Field>
               </div>
               <Toggle
-                label="Item prices include GST"
+                label="Item prices include CGST and SGST"
                 value={config.gstInclusive}
                 onChange={(v) =>
                   setConfig((c) => (c ? { ...c, gstInclusive: v } : c))
@@ -1240,6 +1369,231 @@ export default function Admin() {
           )}
         </main>
       </div>
+      {counterOpen && (
+        <div className="overlay" onClick={() => !busy && setCounterOpen(false)}>
+          <section
+            className="modal edit-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Add counter order"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-head">
+              <h2>Add counter order</h2>
+              <button
+                type="button"
+                aria-label="Close counter order"
+                disabled={busy}
+                onClick={() => setCounterOpen(false)}
+              >
+                <X />
+              </button>
+            </div>
+            <form
+              className="modal-body"
+              onSubmit={(e) => {
+                e.preventDefault();
+                run(async () => {
+                  const items = Object.entries(counterItems)
+                    .filter(([, quantity]) => quantity > 0)
+                    .map(([id, quantity]) => ({ id: Number(id), quantity }));
+                  if (!items.length) throw new Error("Add at least one item");
+                  const result = await api<{ order: Order }>(
+                    "/admin/orders",
+                    "POST",
+                    { ...counter, requestKey: counterRequestKey, items },
+                  );
+                  setCounterOpen(false);
+                  setCounter({ table: 1, name: "", email: "", phone: "" });
+                  setCounterItems({});
+                  setCounterSearch("");
+                  setCounterRequestKey(crypto.randomUUID());
+                  setSelected(result.order);
+                  await load();
+                }, "Counter order created");
+              }}
+            >
+              <div className="form-grid">
+                <Field label="Table number">
+                  <input
+                    type="number"
+                    min={1}
+                    max={999}
+                    required
+                    value={counter.table}
+                    onChange={(e) =>
+                      setCounter({ ...counter, table: Number(e.target.value) })
+                    }
+                  />
+                </Field>
+                <Field label="Customer name">
+                  <input
+                    required
+                    maxLength={80}
+                    value={counter.name}
+                    onChange={(e) =>
+                      setCounter({ ...counter, name: e.target.value })
+                    }
+                  />
+                </Field>
+                <Field label="Phone (optional)">
+                  <input
+                    type="tel"
+                    maxLength={25}
+                    value={counter.phone}
+                    onChange={(e) =>
+                      setCounter({ ...counter, phone: e.target.value })
+                    }
+                  />
+                </Field>
+                <Field label="Email (optional)">
+                  <input
+                    type="email"
+                    maxLength={150}
+                    value={counter.email}
+                    onChange={(e) =>
+                      setCounter({ ...counter, email: e.target.value })
+                    }
+                  />
+                </Field>
+              </div>
+              <Field label="Find item by code or name">
+                <input
+                  ref={counterSearchRef}
+                  type="search"
+                  placeholder="Start typing an item code or name"
+                  value={counterSearch}
+                  onChange={(e) => setCounterSearch(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      if (counterMatches[0])
+                        addCounterItem(counterMatches[0].id);
+                    }
+                  }}
+                />
+              </Field>
+              {counterSearch.trim() && (
+                <div
+                  className="counter-search-results"
+                  role="listbox"
+                  aria-label="Matching menu items"
+                >
+                  {counterMatches.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className="counter-pick"
+                      onClick={() => addCounterItem(item.id)}
+                      aria-label={`Add ${item.name}`}
+                    >
+                      <span>
+                        <strong>{item.name}</strong>
+                        <small>{item.code}</small>
+                      </span>
+                      <span>
+                        {money(item.price)} <Plus size={15} />
+                      </span>
+                    </button>
+                  ))}
+                  {!counterMatches.length && (
+                    <p className="muted">No matching available items.</p>
+                  )}
+                </div>
+              )}
+              {(
+                [
+                  [
+                    "Today's picks",
+                    counterMenu.filter((item) => item.todaySpecial),
+                  ],
+                  [
+                    "Dashboard favourites",
+                    counterMenu.filter((item) => item.dashboardFav),
+                  ],
+                ] as const
+              ).map(
+                ([title, items]) =>
+                  items.length > 0 && (
+                    <section className="counter-quick-picks" key={title}>
+                      <h3>{title}</h3>
+                      <div>
+                        {items.map((item) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            className="counter-pick"
+                            onClick={() => addCounterItem(item.id)}
+                            aria-label={`Add ${item.name}`}
+                          >
+                            <span>
+                              <strong>{item.name}</strong>
+                              <small>{item.code}</small>
+                            </span>
+                            <span>
+                              {money(item.price)} <Plus size={15} />
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+                  ),
+              )}
+              <section className="counter-selected">
+                <h3>Order items</h3>
+                {counterMenu
+                  .filter((item) => counterItems[item.id] > 0)
+                  .map((item) => (
+                    <div className="counter-selected-row" key={item.id}>
+                      <span>
+                        <strong>{item.name}</strong>
+                        <small>
+                          {item.code} · {money(item.price)}
+                        </small>
+                      </span>
+                      <div className="quantity">
+                        <button
+                          type="button"
+                          aria-label={`Remove one ${item.name}`}
+                          onClick={() =>
+                            setCounterItems((items) => ({
+                              ...items,
+                              [item.id]: Math.max(0, items[item.id] - 1),
+                            }))
+                          }
+                        >
+                          <Minus size={15} />
+                        </button>
+                        <b>{counterItems[item.id]}</b>
+                        <button
+                          type="button"
+                          aria-label={`Add one ${item.name}`}
+                          disabled={counterItems[item.id] >= 50}
+                          onClick={() => addCounterItem(item.id)}
+                        >
+                          <Plus size={15} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                {!Object.values(counterItems).some((n) => n > 0) && (
+                  <p className="muted">
+                    Search or select a quick pick to add items.
+                  </p>
+                )}
+              </section>
+              {error && (
+                <p className="alert" role="alert">
+                  {error}
+                </p>
+              )}
+              <button className="btn full" disabled={busy}>
+                <Plus size={16} /> Create order
+              </button>
+            </form>
+          </section>
+        </div>
+      )}
       {selected && (
         <div className="overlay" onClick={() => !busy && setSelected(null)}>
           <section
@@ -1255,6 +1609,18 @@ export default function Admin() {
                   TABLE {selected.tableNumber} · {selected.number}
                 </span>
                 <h2>{selected.name}</h2>
+                <button
+                  className="text-button"
+                  onClick={() =>
+                    run(async () => {
+                      await navigator.clipboard.writeText(
+                        `${location.origin}/order/${selected.trackingToken}`,
+                      );
+                    }, "Customer tracking link copied")
+                  }
+                >
+                  Copy customer tracking link
+                </button>
               </div>
               <button
                 disabled={busy}
@@ -1292,10 +1658,10 @@ export default function Admin() {
                   <span>Taxable amount</span>
                   <span>{money(selected.amounts.taxable)}</span>
                 </div>
-                <div>
-                  <span>GST ({selected.restaurant.gstRate}%)</span>
-                  <span>{money(selected.amounts.gst)}</span>
-                </div>
+                <TaxLines
+                  restaurant={selected.restaurant}
+                  amounts={selected.amounts}
+                />
                 <div className="bill-total">
                   <strong>Total</strong>
                   <strong>{money(selected.amounts.total)}</strong>
@@ -1311,6 +1677,65 @@ export default function Admin() {
                   </div>
                 )}
               </div>
+              <section className="messages">
+                <h3>
+                  <MessageCircle size={18} /> Messages
+                </h3>
+                <div className="message-list">
+                  {selected.messages.length ? (
+                    selected.messages.map((message) => (
+                      <div
+                        key={message.id}
+                        className={`message message-${message.sender}`}
+                      >
+                        <strong>
+                          {message.sender === "staff"
+                            ? "Cafe77 team"
+                            : "Customer"}
+                        </strong>
+                        <p>{message.text}</p>
+                        <small>{indianTime(message.at)}</small>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="muted">No messages yet.</p>
+                  )}
+                </div>
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    run(async () => {
+                      await api(
+                        `/admin/orders/${selected.id}/messages`,
+                        "POST",
+                        { text: messageText },
+                      );
+                      setMessageText("");
+                      setSelected(
+                        await api<Order>(`/admin/orders/${selected.id}`),
+                      );
+                      await load();
+                    });
+                  }}
+                >
+                  <label className="field">
+                    Reply to customer
+                    <textarea
+                      maxLength={1000}
+                      required
+                      rows={2}
+                      value={messageText}
+                      onChange={(e) => setMessageText(e.target.value)}
+                    />
+                  </label>
+                  <button
+                    className="btn secondary"
+                    disabled={busy || !messageText.trim()}
+                  >
+                    Send message
+                  </button>
+                </form>
+              </section>
               {error && (
                 <p className="alert" role="alert">
                   {error}
@@ -1557,6 +1982,44 @@ export default function Admin() {
                   }
                 />
               </Field>
+              <Field label="Calories or nutrition (optional)">
+                <textarea
+                  maxLength={500}
+                  rows={2}
+                  value={editItem.calories}
+                  onChange={(e) =>
+                    setEditItem((i) =>
+                      i ? { ...i, calories: e.target.value } : i,
+                    )
+                  }
+                />
+              </Field>
+              <Toggle
+                label="Show calories or nutrition to customers"
+                value={editItem.showCalories}
+                onChange={(v) =>
+                  setEditItem((i) => (i ? { ...i, showCalories: v } : i))
+                }
+              />
+              <Field label="Ingredients (comma-separated, optional)">
+                <textarea
+                  maxLength={2000}
+                  rows={2}
+                  value={editItem.ingredients}
+                  onChange={(e) =>
+                    setEditItem((i) =>
+                      i ? { ...i, ingredients: e.target.value } : i,
+                    )
+                  }
+                />
+              </Field>
+              <Toggle
+                label="Show ingredients to customers"
+                value={editItem.showIngredients}
+                onChange={(v) =>
+                  setEditItem((i) => (i ? { ...i, showIngredients: v } : i))
+                }
+              />
               <Field label="YouTube video URL (optional)">
                 <input
                   type="url"

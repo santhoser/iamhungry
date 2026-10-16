@@ -17,7 +17,9 @@ export interface Restaurant {
   address: string;
   phone: string;
   gstin: string;
-  gstRate: number;
+  cgstRate: number;
+  sgstRate: number;
+  gstRate?: number; // Legacy order snapshots only.
   gstInclusive: boolean;
   currency: string;
   timezone: string;
@@ -42,6 +44,10 @@ export interface MenuItem {
   name: string;
   price: number;
   details: string;
+  calories: string;
+  showCalories: boolean;
+  ingredients: string;
+  showIngredients: boolean;
   images: string[];
   video: string;
   active: boolean;
@@ -53,24 +59,51 @@ export interface Totals {
   subtotal: number;
   taxable: number;
   gst: number;
+  cgst: number;
+  sgst: number;
   total: number;
 }
 export function totals(
   lines: { price: number; quantity: number }[],
-  rate: number,
+  cgstRate: number,
+  sgstRate: number,
   inclusive: boolean,
 ): Totals {
   const subtotal = lines.reduce((sum, x) => sum + x.price * x.quantity, 0);
-  const basisPoints = Math.round(rate * 100);
-  const gst = inclusive
-    ? Math.round((subtotal * basisPoints) / (10000 + basisPoints))
-    : Math.round((subtotal * basisPoints) / 10000);
+  const cgstPoints = Math.round(cgstRate * 100);
+  const sgstPoints = Math.round(sgstRate * 100);
+  const basisPoints = cgstPoints + sgstPoints;
+  const includedTax = Math.round(
+    (subtotal * basisPoints) / (10000 + basisPoints),
+  );
+  const cgst = inclusive
+    ? basisPoints
+      ? Math.round((includedTax * cgstPoints) / basisPoints)
+      : 0
+    : Math.round((subtotal * cgstPoints) / 10000);
+  const sgst = inclusive
+    ? includedTax - cgst
+    : Math.round((subtotal * sgstPoints) / 10000);
+  const gst = cgst + sgst;
   return {
     subtotal,
     taxable: inclusive ? subtotal - gst : subtotal,
     gst,
+    cgst,
+    sgst,
     total: inclusive ? subtotal : subtotal + gst,
   };
+}
+// New settings default to 2.5% each; do not apply this to historical order snapshots.
+export function normalizeRestaurantConfig(
+  raw: Record<string, unknown>,
+): Restaurant {
+  const { gstRate: _legacyRate, ...settings } = raw;
+  return {
+    ...settings,
+    cgstRate: raw.cgstRate ?? 2.5,
+    sgstRate: raw.sgstRate ?? 2.5,
+  } as Restaurant;
 }
 export const money = (paise: number) =>
   new Intl.NumberFormat("en-IN", {
@@ -95,6 +128,7 @@ export interface OrderLine {
 export interface Order {
   id: number;
   number: string;
+  trackingToken: string;
   tableNumber: number;
   name: string;
   email: string;
@@ -116,4 +150,11 @@ export interface Order {
     at: string;
   }[];
   payments: { kind: string; amount: number; actor: string; at: string }[];
+  messages: {
+    id: number;
+    sender: "customer" | "staff";
+    text: string;
+    at: string;
+    readAt: string | null;
+  }[];
 }

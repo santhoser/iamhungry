@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { openDatabase, hashPassword } from "../server/db.js";
 import { createApp } from "../server/app.js";
 import { orderTimestamp } from "../server/order-number.js";
+import { DatabaseSync } from "node:sqlite";
 
 test("soft deletes preserve history, invalidate stale links, restrict cashiers and protect linked groups", async () => {
   const db = openDatabase(":memory:");
@@ -326,6 +327,43 @@ test("existing database migration retains rows and is safe to run again", () => 
     assert.equal(
       (db.prepare("SELECT count(*) AS n FROM menu").get() as any).n,
       1,
+    );
+  } finally {
+    db.close();
+    for (const suffix of ["", "-wal", "-shm"])
+      rmSync(path + suffix, { force: true });
+    rmdirSync(dir);
+  }
+});
+
+test("existing messages are backfilled as read during local migration", () => {
+  const dir = mkdtempSync(join(tmpdir(), "cafe77-message-migration-"));
+  const path = join(dir, "cafe77.sqlite");
+  let db = new DatabaseSync(path);
+  try {
+    db.exec(
+      "CREATE TABLE order_messages(id INTEGER PRIMARY KEY,order_id INTEGER,sender TEXT,text TEXT,at TEXT)",
+    );
+    db.prepare(
+      "INSERT INTO order_messages(order_id,sender,text,at) VALUES(?,?,?,?)",
+    ).run(1, "staff", "Existing message", "2026-10-14T00:00:00.000Z");
+    db.close();
+    db = openDatabase(path);
+    const message = db
+      .prepare("SELECT at,read_at FROM order_messages")
+      .get() as any;
+    assert.equal(message.read_at, message.at);
+    db.close();
+    db = openDatabase(path);
+    assert.equal(
+      (
+        db
+          .prepare(
+            "SELECT count(*) AS n FROM order_messages WHERE read_at IS NULL",
+          )
+          .get() as any
+      ).n,
+      0,
     );
   } finally {
     db.close();

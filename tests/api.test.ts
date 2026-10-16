@@ -89,6 +89,159 @@ test("complete counter order lifecycle, permissions, audit, refunds and privacy"
     const menu = await request("/menu?table=" + token);
     assert.equal(menu.data.table.number, 1);
     assert.equal(menu.data.config.upiEnabled, false);
+    const menuItem = (
+      await request("/admin/menu", "GET", undefined, owner.cookie)
+    ).data.items[0];
+    const privateDetails = {
+      ...menuItem,
+      calories: "500 kcal; protein 20g",
+      ingredients: "milk, wheat",
+      showCalories: false,
+      showIngredients: false,
+    };
+    assert.equal(
+      (
+        await request(
+          `/admin/menu/${menuItem.id}`,
+          "PUT",
+          privateDetails,
+          owner.cookie,
+        )
+      ).status,
+      200,
+    );
+    let publicItem = (await request("/menu?table=" + token)).data.items.find(
+      (i: any) => i.id === menuItem.id,
+    );
+    assert.equal(publicItem.calories, "");
+    assert.equal(publicItem.ingredients, "");
+    assert.equal(
+      (
+        await request(
+          `/admin/menu/${menuItem.id}`,
+          "PUT",
+          { ...privateDetails, showCalories: true, showIngredients: true },
+          owner.cookie,
+        )
+      ).status,
+      200,
+    );
+    publicItem = (await request("/menu?table=" + token)).data.items.find(
+      (i: any) => i.id === menuItem.id,
+    );
+    assert.equal(publicItem.calories, privateDetails.calories);
+    assert.equal(publicItem.ingredients, privateDetails.ingredients);
+    const counterInput = {
+      table: 1,
+      name: "Walk-in guest",
+      requestKey: randomUUID(),
+      items: [{ id: menuItem.id, quantity: 1 }],
+    };
+    assert.equal(
+      (await request("/admin/orders", "POST", counterInput)).status,
+      401,
+    );
+    assert.equal(
+      (
+        await request(
+          "/admin/orders",
+          "POST",
+          { ...counterInput, table: 999 },
+          cashier.cookie,
+        )
+      ).status,
+      400,
+    );
+    const counterOrder = await request(
+      "/admin/orders",
+      "POST",
+      counterInput,
+      cashier.cookie,
+    );
+    assert.equal(counterOrder.status, 201);
+    assert.equal(counterOrder.data.order.tableNumber, 1);
+    assert.equal(counterOrder.data.order.events[0].actor, "testcashier");
+    assert.equal(
+      (
+        await request(`/orders/${counterOrder.data.token}/messages`, "POST", {
+          text: "Please bring water",
+        })
+      ).status,
+      201,
+    );
+    let conversation = await request(
+      `/admin/orders/${counterOrder.data.order.id}`,
+      "GET",
+      undefined,
+      cashier.cookie,
+    );
+    assert.equal(conversation.data.messages[0].text, "Please bring water");
+    assert.equal(conversation.data.messages[0].readAt, null);
+    assert.equal(
+      (
+        await request(
+          `/admin/orders/${counterOrder.data.order.id}/messages/read`,
+          "POST",
+          {},
+        )
+      ).status,
+      401,
+    );
+    assert.equal(
+      (
+        await request(
+          `/admin/orders/${counterOrder.data.order.id}/messages/read`,
+          "POST",
+          {},
+          cashier.cookie,
+        )
+      ).status,
+      200,
+    );
+    conversation = await request(
+      `/admin/orders/${counterOrder.data.order.id}`,
+      "GET",
+      undefined,
+      cashier.cookie,
+    );
+    assert.ok(conversation.data.messages[0].readAt);
+    assert.equal(
+      (
+        await request(
+          `/admin/orders/${counterOrder.data.order.id}/messages`,
+          "POST",
+          { text: "On our way" },
+          cashier.cookie,
+        )
+      ).status,
+      201,
+    );
+    conversation = await request(`/orders/${counterOrder.data.token}`);
+    assert.equal(conversation.data.messages[1].text, "On our way");
+    assert.equal(conversation.data.messages[1].readAt, null);
+    assert.equal(
+      (
+        await request(
+          `/orders/${counterOrder.data.token}/messages/read`,
+          "POST",
+          {},
+        )
+      ).status,
+      200,
+    );
+    conversation = await request(`/orders/${counterOrder.data.token}`);
+    assert.ok(conversation.data.messages[1].readAt);
+    assert.equal(
+      (
+        await request(
+          `/admin/orders/${counterOrder.data.order.id}/status`,
+          "POST",
+          { status: "Cancelled", version: 1, reason: "Test complete" },
+          cashier.cookie,
+        )
+      ).status,
+      200,
+    );
     const input = {
       table: token,
       name: "Test customer",
@@ -102,6 +255,10 @@ test("complete counter order lifecycle, permissions, audit, refunds and privacy"
     let order = placed.data.order;
     assert.equal(order.amounts.total, 16000);
     assert.equal(order.paid, 0);
+    assert.equal(order.restaurant.cgstRate, 2.5);
+    assert.equal(order.restaurant.sgstRate, 2.5);
+    assert.equal(order.amounts.cgst, 381);
+    assert.equal(order.amounts.sgst, 381);
     const retry = await request("/orders", "POST", input);
     assert.equal(retry.data.order.id, order.id);
     assert.equal(retry.data.token, placed.data.token);

@@ -8,6 +8,7 @@ import {
   createHash,
 } from "node:crypto";
 import type { Restaurant } from "../shared/domain.js";
+import { normalizeRestaurantConfig } from "../shared/domain.js";
 
 export function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
@@ -26,7 +27,9 @@ export const configPath = resolve(
   process.env.CAFE77_CONFIG || "config/restaurant.json",
 );
 export function readConfig(): Restaurant {
-  return JSON.parse(readFileSync(configPath, "utf8"));
+  return normalizeRestaurantConfig(
+    JSON.parse(readFileSync(configPath, "utf8")),
+  );
 }
 export function openDatabase(
   path = process.env.CAFE77_DB || "data/cafe77.sqlite",
@@ -45,6 +48,8 @@ export function openDatabase(
     CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY,order_id INTEGER NOT NULL REFERENCES orders(id),previous TEXT,status TEXT NOT NULL,reason TEXT NOT NULL DEFAULT '',actor TEXT NOT NULL,at TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS payments(id INTEGER PRIMARY KEY,order_id INTEGER NOT NULL REFERENCES orders(id),kind TEXT NOT NULL CHECK(kind IN ('payment','refund')),amount INTEGER NOT NULL CHECK(amount>0),actor TEXT NOT NULL,at TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY,actor TEXT NOT NULL,action TEXT NOT NULL,details TEXT NOT NULL,at TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS order_messages(id INTEGER PRIMARY KEY,order_id INTEGER NOT NULL REFERENCES orders(id),sender TEXT NOT NULL CHECK(sender IN ('customer','staff')),text TEXT NOT NULL,at TEXT NOT NULL);
+    CREATE INDEX IF NOT EXISTS messages_order ON order_messages(order_id,id);
     CREATE INDEX IF NOT EXISTS orders_created ON orders(created_at DESC);
     CREATE INDEX IF NOT EXISTS orders_status ON orders(status);
     CREATE INDEX IF NOT EXISTS events_order ON events(order_id);
@@ -60,6 +65,22 @@ export function openDatabase(
       }
     }
     db.exec("CREATE INDEX IF NOT EXISTS menu_group ON menu(group_id)");
+    const menuColumns = db.prepare("PRAGMA table_info(menu)").all();
+    for (const [name, definition] of [
+      ["calories", "TEXT NOT NULL DEFAULT ''"],
+      ["show_calories", "INTEGER NOT NULL DEFAULT 0"],
+      ["ingredients", "TEXT NOT NULL DEFAULT ''"],
+      ["show_ingredients", "INTEGER NOT NULL DEFAULT 0"],
+    ])
+      if (!menuColumns.some((column) => column.name === name))
+        db.exec(`ALTER TABLE menu ADD COLUMN ${name} ${definition}`);
+    const messageColumns = db
+      .prepare("PRAGMA table_info(order_messages)")
+      .all();
+    if (!messageColumns.some((column) => column.name === "read_at")) {
+      db.exec("ALTER TABLE order_messages ADD COLUMN read_at TEXT");
+      db.exec("UPDATE order_messages SET read_at=at");
+    }
   });
   return db;
 }
