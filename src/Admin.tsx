@@ -30,6 +30,7 @@ import {
 import QRCode from "qrcode";
 import { api } from "./api";
 import { exportHistory } from "./export-orders";
+import { exportMenuHistory } from "./export-menu-history";
 import { Brand, Receipt, indianTime } from "./App";
 import ConfirmDialog, { type Confirmation } from "./ConfirmDialog";
 import {
@@ -39,13 +40,23 @@ import {
   transitions,
   type Group,
   type MenuItem,
+  type Tag,
+  type MenuHistoryEntry,
+  type CustomOrderItem,
   type Order,
   type Restaurant,
   type Role,
 } from "../shared/domain";
 type Staff = { id: number; username: string; role: Role };
 type Tab =
-  "dashboard" | "orders" | "history" | "menu" | "qr" | "settings" | "users";
+  | "dashboard"
+  | "orders"
+  | "history"
+  | "menu"
+  | "menuReports"
+  | "qr"
+  | "settings"
+  | "users";
 const blankItem: MenuItem = {
   id: 0,
   groupId: 1,
@@ -63,6 +74,7 @@ const blankItem: MenuItem = {
   ranOut: false,
   todaySpecial: false,
   dashboardFav: false,
+  tags: [],
 };
 const today = () => new Date(Date.now() + 19800000).toISOString().slice(0, 10);
 function presetRange(preset: string) {
@@ -118,7 +130,7 @@ const nav = [
   { id: "dashboard", name: "Overview", icon: LayoutDashboard, owner: true },
   { id: "orders", name: "Current orders", icon: ClipboardList },
   { id: "history", name: "Order history", icon: History },
-  { id: "menu", name: "Menu & availability", icon: UtensilsCrossed },
+  { id: "menu", name: "Manage menu", icon: UtensilsCrossed },
   { id: "qr", name: "Table QR codes", icon: QrCode, owner: true },
   { id: "users", name: "Staff accounts", icon: Users, owner: true },
   { id: "settings", name: "Restaurant settings", icon: Settings, owner: true },
@@ -139,6 +151,7 @@ export default function Admin() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [query, setQuery] = useState("");
+  const [historyStatuses, setHistoryStatuses] = useState<string[]>([]);
   const [range, setRange] = useState(presetRange("today"));
   const [preset, setPreset] = useState("today");
   const [selected, setSelected] = useState<Order | null>(null);
@@ -150,6 +163,13 @@ export default function Admin() {
     phone: "",
   });
   const [counterItems, setCounterItems] = useState<Record<number, number>>({});
+  const [counterCustom, setCounterCustom] = useState<CustomOrderItem[]>([]);
+  const [customDraft, setCustomDraft] = useState({
+    name: "",
+    price: "",
+    quantity: 1,
+  });
+  const [appendOrder, setAppendOrder] = useState<Order | null>(null);
   const [counterRequestKey, setCounterRequestKey] = useState(() =>
     crypto.randomUUID(),
   );
@@ -184,12 +204,23 @@ export default function Admin() {
   const [reason, setReason] = useState("");
   const [receipt, setReceipt] = useState<Order | null>(null);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
-  const [menu, setMenu] = useState<{ items: MenuItem[]; groups: Group[] }>({
+  const [menu, setMenu] = useState<{
+    items: MenuItem[];
+    groups: Group[];
+    tags: Tag[];
+  }>({
     items: [],
     groups: [],
+    tags: [],
   });
+  const [tagsOpen, setTagsOpen] = useState(false);
+  const [editTag, setEditTag] = useState<Tag | null>(null);
   const [editItem, setEditItem] = useState<MenuItem | null>(null);
+  const [menuUserComments, setMenuUserComments] = useState("");
   const [editGroup, setEditGroup] = useState<Group | null>(null);
+  const [menuHistory, setMenuHistory] = useState<MenuHistoryEntry[]>([]);
+  const [historyTotal, setHistoryTotal] = useState(0);
+  const [historyFilters, setHistoryFilters] = useState<string[]>([]);
   const [dash, setDash] = useState<any>(null);
   const [tables, setTables] = useState<
     { number: number; token: string; active: number }[]
@@ -235,6 +266,9 @@ export default function Admin() {
       page: String(page),
       q: query,
       ...(tab === "history" ? range : {}),
+      ...(tab === "history" && historyStatuses.length
+        ? { statuses: historyStatuses.join(",") }
+        : {}),
       current: String(tab === "orders"),
     });
     if (tab === "orders" || tab === "history") {
@@ -243,6 +277,19 @@ export default function Admin() {
       setTotal(d.total);
     }
     if (tab === "menu") setMenu(await api("/admin/menu"));
+    if (tab === "menuReports") {
+      const d = await api(
+        "/admin/menu/history?" +
+          new URLSearchParams({
+            ...range,
+            q: query,
+            filters: historyFilters.join(","),
+            page: String(page),
+          }),
+      );
+      setMenuHistory(d.entries);
+      setHistoryTotal(d.total);
+    }
     if (tab === "dashboard")
       setDash(await api("/admin/dashboard?" + new URLSearchParams(range)));
     if (tab === "qr") setTables(await api("/admin/tables"));
@@ -255,8 +302,7 @@ export default function Admin() {
       if (alive) load().catch((e) => alive && setError(e.message));
     };
     refresh();
-    const live =
-      user && ["orders", "history", "dashboard", "menu"].includes(tab);
+    const live = user && tab === "orders";
     const timer = live ? setInterval(refresh, 5000) : null;
     const events = live ? new EventSource("/api/admin/events") : null;
     events?.addEventListener("change", refresh);
@@ -265,9 +311,18 @@ export default function Admin() {
       if (timer) clearInterval(timer);
       events?.close();
     };
-  }, [user, tab, page, query, range.from, range.to]);
+  }, [
+    user,
+    tab,
+    page,
+    query,
+    range.from,
+    range.to,
+    historyFilters.join(","),
+    historyStatuses.join(","),
+  ]);
   useEffect(() => {
-    if (!selected) return;
+    if (!selected || tab !== "orders") return;
     let alive = true;
     const id = selected.id;
     const refresh = async () => {
@@ -294,7 +349,7 @@ export default function Admin() {
       alive = false;
       clearInterval(timer);
     };
-  }, [selected?.id]);
+  }, [selected?.id, tab]);
   useEffect(() => {
     if (!config || !tables.length) return;
     let alive = true;
@@ -366,6 +421,94 @@ export default function Admin() {
         }}
       />
     </div>
+  );
+  const addCustomItem = () => {
+    const name = customDraft.name.trim();
+    if (
+      !name ||
+      !/^\d+(\.\d{1,2})?$/.test(customDraft.price) ||
+      Number(customDraft.price) > 100000 ||
+      !Number.isInteger(customDraft.quantity) ||
+      customDraft.quantity < 1 ||
+      customDraft.quantity > 50
+    )
+      return setError(
+        "Enter a custom item name, a valid price (up to ₹100,000), and a quantity from 1 to 50.",
+      );
+    if (counterCustom.length >= 10)
+      return setError("Add at most 10 custom items.");
+    setCounterCustom((items) => [
+      ...items,
+      {
+        name,
+        price: Math.round(Number(customDraft.price) * 100),
+        quantity: customDraft.quantity,
+      },
+    ]);
+    setCustomDraft({ name: "", price: "", quantity: 1 });
+    setError("");
+  };
+  const customItemsEditor = (
+    <section className="counter-selected">
+      <h3>Custom items and fees</h3>
+      <div className="form-grid">
+        <Field label="Item or fee name">
+          <input
+            maxLength={100}
+            value={customDraft.name}
+            onChange={(e) =>
+              setCustomDraft((d) => ({ ...d, name: e.target.value }))
+            }
+            placeholder="e.g. Parcel fee"
+          />
+        </Field>
+        <Field label="Price (₹)">
+          <input
+            type="number"
+            min={0}
+            max={100000}
+            step="0.01"
+            value={customDraft.price}
+            onChange={(e) =>
+              setCustomDraft((d) => ({ ...d, price: e.target.value }))
+            }
+          />
+        </Field>
+        <Field label="Quantity">
+          <input
+            type="number"
+            min={1}
+            max={50}
+            value={customDraft.quantity}
+            onChange={(e) =>
+              setCustomDraft((d) => ({
+                ...d,
+                quantity: Number(e.target.value),
+              }))
+            }
+          />
+        </Field>
+      </div>
+      <button className="btn secondary" type="button" onClick={addCustomItem}>
+        <Plus size={15} /> Add custom item
+      </button>
+      {counterCustom.map((item, index) => (
+        <div className="counter-selected-row" key={index}>
+          <span>
+            {item.quantity} × {item.name} · {money(item.price)}
+          </span>
+          <button
+            type="button"
+            className="text-button"
+            onClick={() =>
+              setCounterCustom((items) => items.filter((_, n) => n !== index))
+            }
+          >
+            Remove
+          </button>
+        </div>
+      ))}
+    </section>
   );
   if (loading || !config)
     return (
@@ -456,7 +599,10 @@ export default function Admin() {
         </section>
       </main>
     );
-  const title = nav.find((n) => n.id === tab)?.name || "";
+  const title =
+    tab === "menuReports"
+      ? "Menu reports"
+      : nav.find((n) => n.id === tab)?.name || "";
   const orderAction = (path: string, body: any) =>
     run(async () => {
       const o = await api<Order>(
@@ -562,7 +708,9 @@ export default function Admin() {
                         : "Keep your cafe running smoothly."}
               </p>
             </div>
-            {["orders", "history", "dashboard"].includes(tab) && (
+            {["orders", "history", "dashboard", "menuReports"].includes(
+              tab,
+            ) && (
               <button
                 className="btn secondary"
                 disabled={busy}
@@ -717,11 +865,42 @@ export default function Admin() {
                       }}
                     />
                   </label>
+                  <div
+                    className="order-status-filters"
+                    aria-label="Order status filters"
+                  >
+                    {(
+                      [
+                        "New",
+                        "Accepted",
+                        "InProgress",
+                        "Ready",
+                        "Closed",
+                        "Cancelled",
+                      ] as const
+                    ).map((status) => (
+                      <label key={status}>
+                        <input
+                          type="checkbox"
+                          checked={historyStatuses.includes(status)}
+                          onChange={(e) => {
+                            setHistoryStatuses((selected) =>
+                              e.target.checked
+                                ? [...selected, status]
+                                : selected.filter((value) => value !== status),
+                            );
+                            setPage(1);
+                          }}
+                        />
+                        {statusLabel(status)}
+                      </label>
+                    ))}
+                  </div>
                   <button
                     className="btn secondary"
                     onClick={() =>
                       run(
-                        () => exportHistory(range, query),
+                        () => exportHistory(range, query, historyStatuses),
                         "Excel export downloaded",
                       )
                     }
@@ -747,9 +926,18 @@ export default function Admin() {
                           const d = await api("/admin/menu");
                           setCounterMenu(
                             d.items.filter(
-                              (i: MenuItem) => i.active && !i.ranOut,
+                              (i: MenuItem) =>
+                                i.active &&
+                                !i.ranOut &&
+                                d.groups.some(
+                                  (g: Group) => g.id === i.groupId && g.active,
+                                ),
                             ),
                           );
+                          setCounterItems({});
+                          setCounterCustom([]);
+                          setCustomDraft({ name: "", price: "", quantity: 1 });
+                          setCounterSearch("");
                           setCounterOpen(true);
                         })
                       }
@@ -855,6 +1043,18 @@ export default function Admin() {
                   <div>
                     <button
                       className="btn secondary"
+                      onClick={() => navigate("menuReports")}
+                    >
+                      <History size={15} /> Menu reports
+                    </button>
+                    <button
+                      className="btn secondary"
+                      onClick={() => setTagsOpen(true)}
+                    >
+                      Tags
+                    </button>
+                    <button
+                      className="btn secondary"
                       onClick={() =>
                         setEditGroup({
                           id: 0,
@@ -862,6 +1062,8 @@ export default function Admin() {
                           image: "",
                           active: true,
                           sort: menu.groups.length,
+                          counterOnly: false,
+                          customerVisible: false,
                         })
                       }
                     >
@@ -869,12 +1071,13 @@ export default function Admin() {
                     </button>
                     <button
                       className="btn"
-                      onClick={() =>
+                      onClick={() => {
+                        setMenuUserComments("");
                         setEditItem({
                           ...blankItem,
                           groupId: menu.groups[0]?.id || 1,
-                        })
-                      }
+                        });
+                      }}
                     >
                       <Plus size={15} /> Add item
                     </button>
@@ -887,6 +1090,9 @@ export default function Admin() {
                     <h3>
                       {g.name}{" "}
                       {!g.active && <span className="status">Inactive</span>}
+                      {g.counterOnly && (
+                        <span className="status">Counter only</span>
+                      )}
                     </h3>
                     {user.role === "owner" && (
                       <div className="group-actions">
@@ -981,7 +1187,10 @@ export default function Admin() {
                           <>
                             <button
                               className="btn secondary small-btn"
-                              onClick={() => setEditItem(i)}
+                              onClick={() => {
+                                setMenuUserComments("");
+                                setEditItem(i);
+                              }}
                             >
                               Edit
                             </button>
@@ -1015,6 +1224,122 @@ export default function Admin() {
                     ))}
                 </section>
               ))}
+            </>
+          )}
+          {tab === "menuReports" && user.role === "owner" && (
+            <>
+              <button className="text-button" onClick={() => navigate("menu")}>
+                ← Manage menu
+              </button>
+              <div className="filter-bar">
+                {dateControls}
+                <label className="search">
+                  <Search size={16} />
+                  <input
+                    aria-label="Search menu history"
+                    placeholder="Item name or code"
+                    value={query}
+                    onChange={(e) => {
+                      setQuery(e.target.value);
+                      setPage(1);
+                    }}
+                  />
+                </label>
+                <button
+                  className="btn secondary"
+                  disabled={busy}
+                  onClick={() =>
+                    run(
+                      () => exportMenuHistory(range, query, historyFilters),
+                      "Excel export downloaded",
+                    )
+                  }
+                >
+                  <Download size={16} /> Export to Excel
+                </button>
+              </div>
+              <div
+                className="menu-report-filters"
+                aria-label="Menu change filters"
+              >
+                {(
+                  [
+                    ["price", "Price changes"],
+                    ["stock_out", "Out of stock"],
+                    ["stock_in", "Back in stock"],
+                    ["today_special", "Today's special"],
+                    ["dashboard_fav", "Dashboard favourite"],
+                    ["visibility", "Visibility"],
+                    ["created", "Created"],
+                    ["deleted", "Discontinued"],
+                  ] as const
+                ).map(([key, label]) => (
+                  <label key={key}>
+                    <input
+                      type="checkbox"
+                      checked={historyFilters.includes(key)}
+                      onChange={(e) => {
+                        setHistoryFilters((filters) =>
+                          e.target.checked
+                            ? [...filters, key]
+                            : filters.filter((f) => f !== key),
+                        );
+                        setPage(1);
+                      }}
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+              <div className="list-heading">
+                <span>{historyTotal} matching changes</span>
+              </div>
+              {menuHistory.length ? (
+                <div className="menu-report-list">
+                  {menuHistory.map((entry) => (
+                    <article className="panel menu-report-entry" key={entry.id}>
+                      <div className="section-head">
+                        <h3>
+                          {entry.itemName} <small>({entry.itemCode})</small>
+                        </h3>
+                        <span>{indianTime(entry.changedAt)}</span>
+                      </div>
+                      <p>
+                        <strong>{entry.changeType}</strong> · {entry.actor}
+                        {entry.isPriceChange ? " · Price changed" : ""}
+                      </p>
+                      <p>{entry.systemComments}</p>
+                      {entry.userComments && (
+                        <p>
+                          <strong>User comment:</strong> {entry.userComments}
+                        </p>
+                      )}
+                      {entry.isPriceChange && (
+                        <p>
+                          {entry.oldPrice === null
+                            ? "—"
+                            : money(entry.oldPrice)}{" "}
+                          →{" "}
+                          {entry.newPrice === null
+                            ? "—"
+                            : money(entry.newPrice)}
+                        </p>
+                      )}
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <Empty
+                  title="No menu changes found"
+                  text="Try a different date range or filter."
+                />
+              )}
+              <Pagination
+                page={page}
+                total={historyTotal}
+                size={50}
+                onChange={setPage}
+              />
             </>
           )}
           {tab === "qr" && (
@@ -1397,15 +1722,22 @@ export default function Admin() {
                   const items = Object.entries(counterItems)
                     .filter(([, quantity]) => quantity > 0)
                     .map(([id, quantity]) => ({ id: Number(id), quantity }));
-                  if (!items.length) throw new Error("Add at least one item");
+                  if (!items.length && !counterCustom.length)
+                    throw new Error("Add at least one item");
                   const result = await api<{ order: Order }>(
                     "/admin/orders",
                     "POST",
-                    { ...counter, requestKey: counterRequestKey, items },
+                    {
+                      ...counter,
+                      requestKey: counterRequestKey,
+                      items,
+                      customItems: counterCustom,
+                    },
                   );
                   setCounterOpen(false);
                   setCounter({ table: 1, name: "", email: "", phone: "" });
                   setCounterItems({});
+                  setCounterCustom([]);
                   setCounterSearch("");
                   setCounterRequestKey(crypto.randomUUID());
                   setSelected(result.order);
@@ -1582,6 +1914,7 @@ export default function Admin() {
                   </p>
                 )}
               </section>
+              {customItemsEditor}
               {error && (
                 <p className="alert" role="alert">
                   {error}
@@ -1643,8 +1976,8 @@ export default function Admin() {
                 </p>
               )}
               <div className="tracking-items">
-                {selected.items.map((i) => (
-                  <div key={i.itemId}>
+                {selected.items.map((i, lineIndex) => (
+                  <div key={`${i.itemId}-${lineIndex}`}>
                     <span>
                       <b>{i.quantity} ×</b> {i.name}
                       <small>{i.code}</small>
@@ -1677,6 +2010,35 @@ export default function Admin() {
                   </div>
                 )}
               </div>
+              {!["Closed", "Cancelled"].includes(selected.status) && (
+                <button
+                  className="btn secondary"
+                  disabled={busy}
+                  onClick={() =>
+                    run(async () => {
+                      const d = await api("/admin/menu");
+                      setCounterMenu(
+                        d.items.filter(
+                          (i: MenuItem) =>
+                            i.active &&
+                            !i.ranOut &&
+                            d.groups.some(
+                              (g: Group) => g.id === i.groupId && g.active,
+                            ),
+                        ),
+                      );
+                      setCounterItems({});
+                      setCounterCustom([]);
+                      setCounterSearch("");
+                      setCustomDraft({ name: "", price: "", quantity: 1 });
+                      setAppendOrder(selected);
+                      setSelected(null);
+                    })
+                  }
+                >
+                  <Plus size={16} /> Add items or fees
+                </button>
+              )}
               <section className="messages">
                 <h3>
                   <MessageCircle size={18} /> Messages
@@ -1875,6 +2237,335 @@ export default function Admin() {
           </section>
         </div>
       )}
+      {appendOrder && (
+        <div
+          className="overlay"
+          onClick={() => {
+            if (!busy) {
+              setAppendOrder(null);
+              setSelected(appendOrder);
+            }
+          }}
+        >
+          <section
+            className="modal edit-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Add items to order"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-head">
+              <h2>Add to {appendOrder.number}</h2>
+              <button
+                type="button"
+                disabled={busy}
+                aria-label="Close add items"
+                onClick={() => {
+                  setAppendOrder(null);
+                  setSelected(appendOrder);
+                }}
+              >
+                <X />
+              </button>
+            </div>
+            <form
+              className="modal-body"
+              onSubmit={(e) => {
+                e.preventDefault();
+                run(async () => {
+                  const items = Object.entries(counterItems)
+                    .filter(([, quantity]) => quantity > 0)
+                    .map(([id, quantity]) => ({ id: Number(id), quantity }));
+                  if (!items.length && !counterCustom.length)
+                    throw new Error("Add at least one item");
+                  const updated = await api<Order>(
+                    `/admin/orders/${appendOrder.id}/items`,
+                    "POST",
+                    {
+                      version: appendOrder.version,
+                      items,
+                      customItems: counterCustom,
+                    },
+                  );
+                  setAppendOrder(null);
+                  setSelected(updated);
+                  setCounterItems({});
+                  setCounterCustom([]);
+                  await load();
+                }, "Items added to order");
+              }}
+            >
+              <p className="muted">
+                Added items will update the bill. Any extra amount can be
+                recorded before closing the order.
+              </p>
+              <Field label="Find item by code or name">
+                <input
+                  ref={counterSearchRef}
+                  type="search"
+                  value={counterSearch}
+                  onChange={(e) => setCounterSearch(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      if (counterMatches[0])
+                        addCounterItem(counterMatches[0].id);
+                    }
+                  }}
+                />
+              </Field>
+              {counterSearch.trim() && (
+                <div
+                  className="counter-search-results"
+                  role="listbox"
+                  aria-label="Matching menu items"
+                >
+                  {counterMatches.map((item) => (
+                    <button
+                      type="button"
+                      className="counter-pick"
+                      key={item.id}
+                      onClick={() => addCounterItem(item.id)}
+                    >
+                      <span>
+                        <strong>{item.name}</strong>
+                        <small>{item.code}</small>
+                      </span>
+                      <span>
+                        {money(item.price)} <Plus size={15} />
+                      </span>
+                    </button>
+                  ))}
+                  {!counterMatches.length && (
+                    <p className="muted">No matching available items.</p>
+                  )}
+                </div>
+              )}
+              {(
+                [
+                  ["Today's picks", counterMenu.filter((i) => i.todaySpecial)],
+                  [
+                    "Dashboard favourites",
+                    counterMenu.filter((i) => i.dashboardFav),
+                  ],
+                ] as const
+              ).map(
+                ([title, items]) =>
+                  items.length > 0 && (
+                    <section className="counter-quick-picks" key={title}>
+                      <h3>{title}</h3>
+                      <div>
+                        {items.map((item) => (
+                          <button
+                            type="button"
+                            className="counter-pick"
+                            key={item.id}
+                            onClick={() => addCounterItem(item.id)}
+                          >
+                            <span>
+                              <strong>{item.name}</strong>
+                              <small>{item.code}</small>
+                            </span>
+                            <span>
+                              {money(item.price)} <Plus size={15} />
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+                  ),
+              )}
+              <section className="counter-selected">
+                <h3>Items to add</h3>
+                {counterMenu
+                  .filter((i) => counterItems[i.id] > 0)
+                  .map((item) => (
+                    <div className="counter-selected-row" key={item.id}>
+                      <span>
+                        {item.name} · {money(item.price)}
+                      </span>
+                      <div className="quantity">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setCounterItems((items) => ({
+                              ...items,
+                              [item.id]: Math.max(0, items[item.id] - 1),
+                            }))
+                          }
+                        >
+                          <Minus size={15} />
+                        </button>
+                        <b>{counterItems[item.id]}</b>
+                        <button
+                          type="button"
+                          disabled={counterItems[item.id] >= 50}
+                          onClick={() => addCounterItem(item.id)}
+                        >
+                          <Plus size={15} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+              </section>
+              {customItemsEditor}
+              {error && (
+                <p className="alert" role="alert">
+                  {error}
+                </p>
+              )}
+              <button className="btn full" disabled={busy}>
+                <Plus size={16} /> Add to order
+              </button>
+            </form>
+          </section>
+        </div>
+      )}
+      {tagsOpen && (
+        <div className="overlay">
+          <section
+            className="modal edit-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Manage tags"
+          >
+            <div className="modal-head">
+              <h2>Tags</h2>
+              <button
+                disabled={busy}
+                aria-label="Close tags"
+                onClick={() => {
+                  setTagsOpen(false);
+                  setEditTag(null);
+                }}
+              >
+                <X />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="tag-list">
+                {menu.tags.map((tag) => (
+                  <div className="tag-row" key={tag.id}>
+                    {tag.image ? (
+                      <img src={tag.image} alt="" />
+                    ) : (
+                      <span className="tag-image-empty" />
+                    )}
+                    <strong>{tag.name}</strong>
+                    <button
+                      type="button"
+                      className="text-button"
+                      onClick={() => setEditTag(tag)}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      className="text-button delete-button"
+                      onClick={() =>
+                        setConfirmation({
+                          title: "Delete tag?",
+                          message: `${tag.name} will be removed from every menu item.`,
+                          confirmLabel: "Delete tag",
+                          destructive: true,
+                          onConfirm: () =>
+                            run(async () => {
+                              await api("/admin/tags/" + tag.id, "DELETE", {});
+                              if (editTag?.id === tag.id) setEditTag(null);
+                              await load();
+                            }, "Tag deleted"),
+                        })
+                      }
+                    >
+                      Delete
+                    </button>
+                  </div>
+                ))}
+                {!menu.tags.length && <p className="muted">No tags yet.</p>}
+              </div>
+              {!editTag ? (
+                <button
+                  type="button"
+                  className="btn secondary"
+                  onClick={() => setEditTag({ id: 0, name: "", image: "" })}
+                >
+                  <Plus size={15} /> Add tag
+                </button>
+              ) : (
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    run(async () => {
+                      await api(
+                        "/admin/tags" + (editTag.id ? "/" + editTag.id : ""),
+                        editTag.id ? "PUT" : "POST",
+                        editTag,
+                      );
+                      setEditTag(null);
+                      await load();
+                    }, "Tag saved");
+                  }}
+                >
+                  <Field label="Tag name">
+                    <input
+                      required
+                      maxLength={60}
+                      value={editTag.name}
+                      onChange={(e) =>
+                        setEditTag((tag) =>
+                          tag ? { ...tag, name: e.target.value } : tag,
+                        )
+                      }
+                    />
+                  </Field>
+                  <Field label="Tag image URL (optional)">
+                    <input
+                      value={editTag.image}
+                      onChange={(e) =>
+                        setEditTag((tag) =>
+                          tag ? { ...tag, image: e.target.value } : tag,
+                        )
+                      }
+                    />
+                  </Field>
+                  <label className="upload">
+                    <Upload size={18} /> Upload tag image
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      disabled={busy}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file)
+                          run(async () => {
+                            const image = await upload(file);
+                            setEditTag((tag) =>
+                              tag ? { ...tag, image } : tag,
+                            );
+                          });
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                  <div className="group-actions">
+                    <button className="btn" disabled={busy}>
+                      Save tag
+                    </button>
+                    <button
+                      type="button"
+                      className="btn secondary"
+                      onClick={() => setEditTag(null)}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              )}
+              {error && <p className="alert">{error}</p>}
+            </div>
+          </section>
+        </div>
+      )}
       {editItem && (
         <div className="overlay">
           <section
@@ -1887,7 +2578,10 @@ export default function Admin() {
               <h2>{editItem.id ? "Edit favourite" : "A new favourite"}</h2>
               <button
                 disabled={busy}
-                onClick={() => setEditItem(null)}
+                onClick={() => {
+                  setEditItem(null);
+                  setMenuUserComments("");
+                }}
                 aria-label="Close editor"
               >
                 <X />
@@ -1901,9 +2595,14 @@ export default function Admin() {
                   await api(
                     "/admin/menu" + (editItem.id ? "/" + editItem.id : ""),
                     editItem.id ? "PUT" : "POST",
-                    editItem,
+                    {
+                      ...editItem,
+                      tagIds: editItem.tags.map((tag) => tag.id),
+                      userComments: menuUserComments,
+                    },
                   );
                   setEditItem(null);
+                  setMenuUserComments("");
                   await load();
                 }, "Menu item saved");
               }}
@@ -2077,6 +2776,40 @@ export default function Admin() {
                   </label>
                 )}
               </div>
+              <div className="field">
+                <span>Tags</span>
+                <div className="tag-choices">
+                  {menu.tags.map((tag) => (
+                    <label key={tag.id} className="tag-choice">
+                      <input
+                        type="checkbox"
+                        checked={editItem.tags.some(
+                          (selected) => selected.id === tag.id,
+                        )}
+                        onChange={(e) =>
+                          setEditItem((current) =>
+                            current
+                              ? {
+                                  ...current,
+                                  tags: e.target.checked
+                                    ? [...current.tags, tag]
+                                    : current.tags.filter(
+                                        (selected) => selected.id !== tag.id,
+                                      ),
+                                }
+                              : current,
+                          )
+                        }
+                      />
+                      {tag.image && <img src={tag.image} alt="" />}
+                      {tag.name}
+                    </label>
+                  ))}
+                  {!menu.tags.length && (
+                    <span className="muted">Create tags from Manage menu.</span>
+                  )}
+                </div>
+              </div>
               <p className="muted">
                 Up to 6 images · PNG/JPEG/WebP · 2 MB each
               </p>
@@ -2099,6 +2832,14 @@ export default function Admin() {
                   }
                 />
               ))}
+              <Field label="Comment on this change (optional)">
+                <textarea
+                  maxLength={1000}
+                  rows={2}
+                  value={menuUserComments}
+                  onChange={(e) => setMenuUserComments(e.target.value)}
+                />
+              </Field>
               {error && (
                 <p className="alert" role="alert">
                   {error}
@@ -2204,6 +2945,22 @@ export default function Admin() {
                   setEditGroup((g) => (g ? { ...g, active: v } : g))
                 }
               />
+              <Toggle
+                label="Counter only"
+                value={editGroup.counterOnly}
+                onChange={(v) =>
+                  setEditGroup((g) => (g ? { ...g, counterOnly: v } : g))
+                }
+              />
+              {editGroup.counterOnly && (
+                <Toggle
+                  label="Show at customer menu (ordering at counter only)"
+                  value={editGroup.customerVisible}
+                  onChange={(v) =>
+                    setEditGroup((g) => (g ? { ...g, customerVisible: v } : g))
+                  }
+                />
+              )}
               {error && <p className="alert">{error}</p>}
               <button className="btn full" disabled={busy}>
                 Save group

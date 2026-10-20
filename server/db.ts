@@ -49,6 +49,15 @@ export function openDatabase(
     CREATE TABLE IF NOT EXISTS payments(id INTEGER PRIMARY KEY,order_id INTEGER NOT NULL REFERENCES orders(id),kind TEXT NOT NULL CHECK(kind IN ('payment','refund')),amount INTEGER NOT NULL CHECK(amount>0),actor TEXT NOT NULL,at TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY,actor TEXT NOT NULL,action TEXT NOT NULL,details TEXT NOT NULL,at TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS order_messages(id INTEGER PRIMARY KEY,order_id INTEGER NOT NULL REFERENCES orders(id),sender TEXT NOT NULL CHECK(sender IN ('customer','staff')),text TEXT NOT NULL,at TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS order_custom_items(id INTEGER PRIMARY KEY,order_id INTEGER NOT NULL REFERENCES orders(id),name TEXT NOT NULL,price INTEGER NOT NULL CHECK(price>=0),quantity INTEGER NOT NULL CHECK(quantity>0),actor TEXT NOT NULL,created_at TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS menu_history(id INTEGER PRIMARY KEY,menu_item_id INTEGER NOT NULL REFERENCES menu(id),item_code TEXT NOT NULL,item_name TEXT NOT NULL,changed_at TEXT NOT NULL,actor TEXT NOT NULL,change_type TEXT NOT NULL,system_comments TEXT NOT NULL,user_comments TEXT NOT NULL DEFAULT '',is_price_change INTEGER NOT NULL DEFAULT 0,old_price INTEGER,new_price INTEGER,old_ran_out INTEGER,new_ran_out INTEGER,old_today_special INTEGER,new_today_special INTEGER,old_dashboard_fav INTEGER,new_dashboard_fav INTEGER,old_active INTEGER,new_active INTEGER,before_json TEXT,after_json TEXT);
+    CREATE TABLE IF NOT EXISTS tags(id INTEGER PRIMARY KEY,name TEXT NOT NULL,image TEXT NOT NULL DEFAULT '');
+    CREATE UNIQUE INDEX IF NOT EXISTS tags_name_unique ON tags(lower(name));
+    CREATE TABLE IF NOT EXISTS menu_tags(menu_item_id INTEGER NOT NULL REFERENCES menu(id),tag_id INTEGER NOT NULL REFERENCES tags(id),PRIMARY KEY(menu_item_id,tag_id));
+    CREATE INDEX IF NOT EXISTS menu_tags_tag ON menu_tags(tag_id,menu_item_id);
+    CREATE INDEX IF NOT EXISTS menu_history_date ON menu_history(changed_at DESC,id DESC);
+    CREATE INDEX IF NOT EXISTS menu_history_item ON menu_history(menu_item_id,changed_at DESC);
+    CREATE INDEX IF NOT EXISTS order_custom_items_order ON order_custom_items(order_id,id);
     CREATE INDEX IF NOT EXISTS messages_order ON order_messages(order_id,id);
     CREATE INDEX IF NOT EXISTS orders_created ON orders(created_at DESC);
     CREATE INDEX IF NOT EXISTS orders_status ON orders(status);
@@ -74,6 +83,15 @@ export function openDatabase(
     ])
       if (!menuColumns.some((column) => column.name === name))
         db.exec(`ALTER TABLE menu ADD COLUMN ${name} ${definition}`);
+    const groupColumns = db.prepare("PRAGMA table_info(groups)").all();
+    if (!groupColumns.some((column) => column.name === "counter_only"))
+      db.exec(
+        "ALTER TABLE groups ADD COLUMN counter_only INTEGER NOT NULL DEFAULT 0",
+      );
+    if (!groupColumns.some((column) => column.name === "customer_visible"))
+      db.exec(
+        "ALTER TABLE groups ADD COLUMN customer_visible INTEGER NOT NULL DEFAULT 0",
+      );
     const messageColumns = db
       .prepare("PRAGMA table_info(order_messages)")
       .all();

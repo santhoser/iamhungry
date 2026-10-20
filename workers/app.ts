@@ -15,6 +15,18 @@ import { hashPassword, checkPassword, digest } from "./crypto.js";
 import { storeUpload, serveUpload } from "./uploads.js";
 import { Buffer } from "node:buffer";
 import { enforceRateLimit } from "./rate-limit.js";
+import {
+  hydrateMenuHistory,
+  menuHistoryFilterOptions,
+  menuHistoryInsert,
+  menuHistoryValues,
+  menuHistoryWhere,
+} from "../shared/menu-history.js";
+import {
+  appendItemsSchema,
+  customItemsSchema,
+  orderTotals,
+} from "../shared/counter-items.js";
 export interface Env {
   DB: D1Database;
   ASSETS?: {
@@ -69,7 +81,14 @@ const menuSchema = z.object({
   ranOut: z.boolean(),
   todaySpecial: z.boolean(),
   dashboardFav: z.boolean(),
+  tagIds: z.array(z.number().int().positive()).max(20).default([]),
+  userComments: z.string().trim().max(1000).default(""),
 });
+const tagSchema = z.object({
+  name: z.string().trim().min(1).max(60),
+  image: safeImage.default(""),
+});
+const menuColumns = `m.*,(SELECT json_group_array(json_object('id',t.id,'name',t.name,'image',t.image)) FROM (SELECT t.id,t.name,t.image FROM tags t JOIN menu_tags mt ON mt.tag_id=t.id WHERE mt.menu_item_id=m.id ORDER BY lower(t.name),t.id) t) AS tags_json`;
 const configSchema = z.object({
   name: z.string().trim().min(1).max(100),
   tagline: z.string().max(150),
@@ -124,6 +143,7 @@ function item(row: any): MenuItem {
     ranOut: !!row.ran_out,
     todaySpecial: !!row.today_special,
     dashboardFav: !!row.dashboard_fav,
+    tags: JSON.parse(row.tags_json || "[]"),
   };
 }
 export async function handleApi(request: globalThis.Request, env: Env) {
@@ -176,6 +196,7 @@ export async function handleApi(request: globalThis.Request, env: Env) {
   const orderSelect = `SELECT o.*,t.number AS table_number,
       (SELECT json_group_array(json_object('kind',p.kind,'amount',p.amount,'actor',p.actor,'at',p.at)) FROM (SELECT * FROM payments WHERE order_id=o.id ORDER BY id) p) AS payment_rows,
       (SELECT json_group_array(json_object('itemId',i.item_id,'code',i.code,'name',i.name,'price',i.price,'quantity',i.quantity)) FROM (SELECT * FROM order_items WHERE order_id=o.id ORDER BY id) i) AS item_rows,
+      (SELECT json_group_array(json_object('itemId',-i.id,'code','CUSTOM','name',i.name,'price',i.price,'quantity',i.quantity,'custom',1)) FROM (SELECT * FROM order_custom_items WHERE order_id=o.id ORDER BY id) i) AS custom_item_rows,
       (SELECT json_group_array(json_object('previous',e.previous,'status',e.status,'reason',e.reason,'actor',e.actor,'at',e.at)) FROM (SELECT * FROM events WHERE order_id=o.id ORDER BY id) e) AS event_rows,
       (SELECT json_group_array(json_object('id',m.id,'sender',m.sender,'text',m.text,'at',m.at,'readAt',m.read_at)) FROM (SELECT * FROM order_messages WHERE order_id=o.id ORDER BY id) m) AS message_rows
       FROM orders o JOIN tables t ON t.id=o.table_id`;
@@ -201,7 +222,10 @@ export async function handleApi(request: globalThis.Request, env: Env) {
         .reduce((sum: number, p: any) => sum + p.amount, 0),
       amounts: JSON.parse(row.amounts),
       restaurant: JSON.parse(row.restaurant),
-      items: JSON.parse(row.item_rows),
+      items: [
+        ...JSON.parse(row.item_rows),
+        ...JSON.parse(row.custom_item_rows),
+      ],
       events: JSON.parse(row.event_rows),
       payments,
       messages: JSON.parse(row.message_rows),
@@ -257,14 +281,19 @@ export async function handleApi(request: globalThis.Request, env: Env) {
       groups: (
         await db
           .prepare(
-            "SELECT id,name,image,active,sort FROM groups WHERE active=1 AND deleted_at IS NULL ORDER BY sort,id",
+            "SELECT id,name,image,active,sort,counter_only,customer_visible FROM groups WHERE active=1 AND (counter_only=0 OR customer_visible=1) AND deleted_at IS NULL ORDER BY sort,id",
           )
           .all()
-      ).map((g: any) => ({ ...g, active: !!g.active })),
+      ).map((g: any) => ({
+        ...g,
+        active: !!g.active,
+        counterOnly: !!g.counter_only,
+        customerVisible: !!g.customer_visible,
+      })),
       items: (
         await db
           .prepare(
-            "SELECT m.* FROM menu m JOIN groups g ON g.id=m.group_id WHERE m.active=1 AND g.active=1 AND m.deleted_at IS NULL AND g.deleted_at IS NULL ORDER BY m.id",
+            `SELECT ${menuColumns} FROM menu m JOIN groups g ON g.id=m.group_id WHERE m.active=1 AND g.active=1 AND (g.counter_only=0 OR g.customer_visible=1) AND m.deleted_at IS NULL AND g.deleted_at IS NULL ORDER BY m.id`,
           )
           .all()
       )
@@ -300,8 +329,11 @@ export async function handleApi(request: globalThis.Request, env: Env) {
               quantity: z.number().int().min(1).max(50),
             }),
           )
-          .min(1)
+          .min(counter ? 0 : 1)
           .max(100),
+        customItems: counter
+          ? customItemsSchema.default([])
+          : z.array(z.never()).max(0).default([]),
       })
       .parse(req.body);
     const requestHash = await digest(JSON.stringify(input));
@@ -331,9 +363,11 @@ export async function handleApi(request: globalThis.Request, env: Env) {
         );
       if (new Set(input.items.map((x) => x.id)).size !== input.items.length)
         fail(400, "Duplicate menu items");
+      if (input.items.length + input.customItems.length === 0)
+        fail(400, "Add at least one item");
       const available = await db
         .prepare(
-          "SELECT m.* FROM menu m JOIN groups g ON g.id=m.group_id WHERE m.id IN (SELECT value FROM json_each(?)) AND m.active=1 AND m.ran_out=0 AND g.active=1 AND m.deleted_at IS NULL AND g.deleted_at IS NULL ORDER BY m.id",
+          `SELECT m.* FROM menu m JOIN groups g ON g.id=m.group_id WHERE m.id IN (SELECT value FROM json_each(?)) AND m.active=1 AND m.ran_out=0 AND g.active=1 ${counter ? "" : "AND g.counter_only=0"} AND m.deleted_at IS NULL AND g.deleted_at IS NULL ORDER BY m.id`,
         )
         .all(JSON.stringify(input.items.map((x) => x.id)));
       const lines = input.items.map((x) => {
@@ -349,7 +383,7 @@ export async function handleApi(request: globalThis.Request, env: Env) {
       });
       const cfg = await publicConfig();
       const amounts = totals(
-        lines,
+        [...lines, ...input.customItems],
         cfg.cgstRate,
         cfg.sgstRate,
         cfg.gstInclusive,
@@ -396,6 +430,12 @@ export async function handleApi(request: globalThis.Request, env: Env) {
             line.price,
             line.quantity,
           );
+      for (const line of input.customItems)
+        await db
+          .prepare(
+            "INSERT INTO order_custom_items(order_id,name,price,quantity,actor,created_at) VALUES(?,?,?,?,?,?)",
+          )
+          .run(id, line.name, line.price, line.quantity, actor, now);
       await db
         .prepare("INSERT INTO events(order_id,status,actor,at) VALUES(?,?,?,?)")
         .run(id, "New", actor, now);
@@ -518,34 +558,152 @@ export async function handleApi(request: globalThis.Request, env: Env) {
             "SELECT g.*,(SELECT count(*) FROM menu m WHERE m.group_id=g.id) AS linkedItemCount FROM groups g WHERE g.deleted_at IS NULL ORDER BY g.sort,g.id",
           )
           .all()
-      ).map((g: any) => ({ ...g, active: !!g.active })),
+      ).map((g: any) => ({
+        ...g,
+        active: !!g.active,
+        counterOnly: !!g.counter_only,
+        customerVisible: !!g.customer_visible,
+      })),
       items: (
         await db
-          .prepare("SELECT * FROM menu WHERE deleted_at IS NULL ORDER BY id")
+          .prepare(
+            `SELECT ${menuColumns} FROM menu m WHERE m.deleted_at IS NULL ORDER BY m.id`,
+          )
           .all()
       ).map(item),
+      tags: await db
+        .prepare("SELECT id,name,image FROM tags ORDER BY lower(name),id")
+        .all(),
     });
+  });
+  app.post("/api/admin/tags", async (req, res) => {
+    const u = await owner(req);
+    const tag = tagSchema.parse(req.body);
+    await transaction(db, async () => {
+      if (
+        await db
+          .prepare("SELECT id FROM tags WHERE lower(name)=lower(?)")
+          .get(tag.name)
+      )
+        fail(409, "Tag name already exists");
+      const next: any = await db
+        .prepare("SELECT coalesce(max(id),0)+1 AS id FROM tags")
+        .get();
+      await db
+        .prepare("INSERT INTO tags(id,name,image) VALUES(?,?,?)")
+        .run(next.id, tag.name, tag.image);
+      await audit(u.username, "tag.create", { id: next.id, name: tag.name });
+    });
+    res.json({ ok: true });
+  });
+  app.put("/api/admin/tags/:id", async (req, res) => {
+    const u = await owner(req);
+    const id = idParam(req);
+    const tag = tagSchema.parse(req.body);
+    await transaction(db, async () => {
+      if (
+        await db
+          .prepare("SELECT id FROM tags WHERE lower(name)=lower(?) AND id<>?")
+          .get(tag.name, id)
+      )
+        fail(409, "Tag name already exists");
+      if (
+        !(
+          await db
+            .prepare("UPDATE tags SET name=?,image=? WHERE id=?")
+            .run(tag.name, tag.image, id)
+        ).changes
+      )
+        fail(404, "Tag not found");
+      await audit(u.username, "tag.update", { id, name: tag.name });
+    });
+    res.json({ ok: true });
+  });
+  app.delete("/api/admin/tags/:id", async (req, res) => {
+    const u = await owner(req);
+    const id = idParam(req);
+    await transaction(db, async () => {
+      if (!(await db.prepare("SELECT id FROM tags WHERE id=?").get(id)))
+        fail(404, "Tag not found");
+      await db.prepare("DELETE FROM menu_tags WHERE tag_id=?").run(id);
+      await db.prepare("DELETE FROM tags WHERE id=?").run(id);
+      await audit(u.username, "tag.delete", { id });
+    });
+    res.json({ ok: true });
+  });
+  app.get("/api/admin/menu/history", async (req, res) => {
+    await owner(req);
+    const page = z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(100000)
+      .parse(req.query.page || 1);
+    const { from, to } = range(req);
+    const q = z
+      .string()
+      .max(100)
+      .parse(req.query.q || "");
+    const filters = z
+      .string()
+      .max(250)
+      .parse(req.query.filters || "")
+      .split(",")
+      .filter(Boolean);
+    if (filters.some((filter) => !menuHistoryFilterOptions.includes(filter)))
+      fail(400, "Invalid menu history filter");
+    const { sql, params } = menuHistoryWhere(from, to, q, filters);
+    const count: any = await db
+      .prepare("SELECT count(*) AS n FROM menu_history WHERE " + sql)
+      .get(...params);
+    const rows = await db
+      .prepare(
+        "SELECT * FROM menu_history WHERE " +
+          sql +
+          " ORDER BY changed_at DESC,id DESC LIMIT 50 OFFSET ?",
+      )
+      .all(...params, (page - 1) * 50);
+    res.json({ entries: rows.map(hydrateMenuHistory), total: count.n, page });
   });
   app.put("/api/admin/menu/:id/stock", async (req, res) => {
     const u = await staff(req);
     const { ranOut } = z.object({ ranOut: z.boolean() }).parse(req.body);
     const id = idParam(req);
-    if (
-      !(
-        await db
-          .prepare(
-            "UPDATE menu SET ran_out=? WHERE id=? AND deleted_at IS NULL",
-          )
-          .run(+ranOut, id)
-      ).changes
-    )
-      fail(404, "Item not found");
-    await audit(u.username, "menu.stock", { id, ranOut });
+    await transaction(db, async () => {
+      const row = await db
+        .prepare(
+          `SELECT ${menuColumns} FROM menu m WHERE m.id=? AND m.deleted_at IS NULL`,
+        )
+        .get(id);
+      if (!row) fail(404, "Item not found");
+      const before = item(row);
+      if (before.ranOut === ranOut) return;
+      await db.prepare("UPDATE menu SET ran_out=? WHERE id=?").run(+ranOut, id);
+      await db
+        .prepare(menuHistoryInsert)
+        .run(
+          ...menuHistoryValues(
+            before,
+            { ...before, ranOut },
+            u.username,
+            "stock",
+          ).values,
+        );
+      await audit(u.username, "menu.stock", { id, ranOut });
+    });
     res.json({ ok: true });
   });
   const saveMenu = async (req: Request, res: Response) => {
     const u = await owner(req);
     const m = menuSchema.parse(req.body);
+    const { userComments, tagIds, ...menuInput } = m;
+    if (new Set(tagIds).size !== tagIds.length) fail(400, "Duplicate tags");
+    const tags = await db
+      .prepare(
+        "SELECT id,name,image FROM tags WHERE id IN (SELECT value FROM json_each(?)) ORDER BY lower(name),id",
+      )
+      .all(JSON.stringify(tagIds));
+    if (tags.length !== tagIds.length) fail(400, "Choose valid tags");
     if (
       !(await db
         .prepare("SELECT id FROM groups WHERE id=? AND deleted_at IS NULL")
@@ -569,25 +727,67 @@ export async function handleApi(request: globalThis.Request, env: Env) {
       +m.todaySpecial,
       +m.dashboardFav,
     ];
-    if (req.params.id) {
-      if (
-        !(
-          await db
+    await transaction(db, async () => {
+      const id = req.params.id ? idParam(req) : 0;
+      const old = id
+        ? await db
             .prepare(
-              "UPDATE menu SET group_id=?,code=?,name=?,price=?,details=?,calories=?,show_calories=?,ingredients=?,show_ingredients=?,images=?,video=?,active=?,ran_out=?,today_special=?,dashboard_fav=? WHERE id=? AND deleted_at IS NULL",
+              `SELECT ${menuColumns} FROM menu m WHERE m.id=? AND m.deleted_at IS NULL`,
             )
-            .run(...values, idParam(req))
-        ).changes
+            .get(id)
+        : null;
+      if (id && !old) fail(404, "Item not found");
+      const before = old ? item(old) : null;
+      const after = { ...menuInput, id, tags };
+      if (
+        !menuHistoryValues(
+          before,
+          after,
+          u.username,
+          id ? "updated" : "created",
+          userComments,
+        ).changed
       )
-        fail(404, "Item not found");
-    } else {
+        return;
+      let savedId = id;
+      if (id)
+        await db
+          .prepare(
+            "UPDATE menu SET group_id=?,code=?,name=?,price=?,details=?,calories=?,show_calories=?,ingredients=?,show_ingredients=?,images=?,video=?,active=?,ran_out=?,today_special=?,dashboard_fav=? WHERE id=? AND deleted_at IS NULL",
+          )
+          .run(...values, id);
+      else {
+        const next: any = await db
+          .prepare("SELECT coalesce(max(id),0)+1 AS id FROM menu")
+          .get();
+        savedId = next.id;
+        await db
+          .prepare(
+            "INSERT INTO menu(id,group_id,code,name,price,details,calories,show_calories,ingredients,show_ingredients,images,video,active,ran_out,today_special,dashboard_fav) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+          )
+          .run(savedId, ...values);
+      }
+      await db
+        .prepare("DELETE FROM menu_tags WHERE menu_item_id=?")
+        .run(savedId);
       await db
         .prepare(
-          "INSERT INTO menu(group_id,code,name,price,details,calories,show_calories,ingredients,show_ingredients,images,video,active,ran_out,today_special,dashboard_fav) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+          "INSERT INTO menu_tags(menu_item_id,tag_id) SELECT ?,value FROM json_each(?)",
         )
-        .run(...values);
-    }
-    await audit(u.username, "menu.save", { id: req.params.id, code: m.code });
+        .run(savedId, JSON.stringify(tagIds));
+      await db
+        .prepare(menuHistoryInsert)
+        .run(
+          ...menuHistoryValues(
+            before,
+            { ...after, id: savedId },
+            u.username,
+            id ? "updated" : "created",
+            userComments,
+          ).values,
+        );
+      await audit(u.username, "menu.save", { id: savedId, code: m.code });
+    });
     res.json({ ok: true });
   };
   app.post("/api/admin/menu", saveMenu);
@@ -595,17 +795,22 @@ export async function handleApi(request: globalThis.Request, env: Env) {
   app.delete("/api/admin/menu/:id", async (req, res) => {
     const u = await owner(req);
     const id = idParam(req);
-    if (
-      !(
-        await db
-          .prepare(
-            "UPDATE menu SET active=0,deleted_at=? WHERE id=? AND deleted_at IS NULL",
-          )
-          .run(new Date().toISOString(), id)
-      ).changes
-    )
-      fail(404, "Item not found");
-    await audit(u.username, "menu.delete", { id });
+    await transaction(db, async () => {
+      const row = await db
+        .prepare(
+          `SELECT ${menuColumns} FROM menu m WHERE m.id=? AND m.deleted_at IS NULL`,
+        )
+        .get(id);
+      if (!row) fail(404, "Item not found");
+      const before = item(row);
+      await db
+        .prepare("UPDATE menu SET active=0,deleted_at=? WHERE id=?")
+        .run(new Date().toISOString(), id);
+      await db
+        .prepare(menuHistoryInsert)
+        .run(...menuHistoryValues(before, null, u.username, "deleted").values);
+      await audit(u.username, "menu.delete", { id });
+    });
     res.json({ ok: true });
   });
   app.post("/api/admin/groups", async (req, res) => {
@@ -616,11 +821,22 @@ export async function handleApi(request: globalThis.Request, env: Env) {
         image: safeImage.default(""),
         active: z.boolean().default(true),
         sort: z.number().int().min(0).max(10000).default(0),
+        counterOnly: z.boolean().default(false),
+        customerVisible: z.boolean().default(false),
       })
       .parse(req.body);
     await db
-      .prepare("INSERT INTO groups(name,image,active,sort) VALUES(?,?,?,?)")
-      .run(g.name, g.image, +g.active, g.sort);
+      .prepare(
+        "INSERT INTO groups(name,image,active,sort,counter_only,customer_visible) VALUES(?,?,?,?,?,?)",
+      )
+      .run(
+        g.name,
+        g.image,
+        +g.active,
+        g.sort,
+        +g.counterOnly,
+        +g.customerVisible,
+      );
     await audit(u.username, "group.create", g);
     res.json({ ok: true });
   });
@@ -632,15 +848,25 @@ export async function handleApi(request: globalThis.Request, env: Env) {
         image: safeImage,
         active: z.boolean(),
         sort: z.number().int().min(0).max(10000),
+        counterOnly: z.boolean().default(false),
+        customerVisible: z.boolean().default(false),
       })
       .parse(req.body);
     if (
       !(
         await db
           .prepare(
-            "UPDATE groups SET name=?,image=?,active=?,sort=? WHERE id=? AND deleted_at IS NULL",
+            "UPDATE groups SET name=?,image=?,active=?,sort=?,counter_only=?,customer_visible=? WHERE id=? AND deleted_at IS NULL",
           )
-          .run(g.name, g.image, +g.active, g.sort, idParam(req))
+          .run(
+            g.name,
+            g.image,
+            +g.active,
+            g.sort,
+            +g.counterOnly,
+            +g.customerVisible,
+            idParam(req),
+          )
       ).changes
     )
       fail(404, "Group not found");
@@ -684,12 +910,35 @@ export async function handleApi(request: globalThis.Request, env: Env) {
       .string()
       .max(100)
       .parse(req.query.q || "");
+    const statuses = z
+      .string()
+      .max(100)
+      .parse(req.query.statuses || "")
+      .split(",")
+      .filter(Boolean)
+      .map((status) =>
+        z
+          .enum([
+            "New",
+            "Accepted",
+            "InProgress",
+            "Ready",
+            "Closed",
+            "Cancelled",
+          ])
+          .parse(status),
+      );
+    if (new Set(statuses).size !== statuses.length)
+      fail(400, "Duplicate order status filter");
     const pattern = q;
     const active = req.query.current === "true";
     const where =
       "o.created_at>=? AND o.created_at<? AND (instr(lower(o.number),lower(?))>0 OR instr(lower(o.name),lower(?))>0 OR instr(lower(o.email),lower(?))>0 OR instr(lower(o.phone),lower(?))>0)" +
-      (active ? " AND o.status NOT IN ('Closed','Cancelled')" : "");
-    const params = [from, to, pattern, pattern, pattern, pattern];
+      (active ? " AND o.status NOT IN ('Closed','Cancelled')" : "") +
+      (statuses.length
+        ? ` AND o.status IN (${statuses.map(() => "?").join(",")})`
+        : "");
+    const params = [from, to, pattern, pattern, pattern, pattern, ...statuses];
     const count: any = await db
       .prepare("SELECT count(*) AS count FROM orders o WHERE " + where)
       .get(...params);
@@ -710,6 +959,85 @@ export async function handleApi(request: globalThis.Request, env: Env) {
   app.get("/api/admin/orders/:id", async (req, res) => {
     await staff(req);
     res.json(await getOrder(idParam(req)));
+  });
+  app.post("/api/admin/orders/:id/items", async (req, res) => {
+    const u = await staff(req);
+    const input = appendItemsSchema.parse(req.body);
+    res.json(
+      await transaction(db, async () => {
+        const order = await getOrder(idParam(req));
+        if (order.version !== input.version)
+          fail(409, "Order changed. Refresh and try again.");
+        if (["Closed", "Cancelled"].includes(order.status))
+          fail(409, "Items cannot be added to this order status");
+        if (new Set(input.items.map((x) => x.id)).size !== input.items.length)
+          fail(400, "Duplicate menu items");
+        const available = await db
+          .prepare(
+            "SELECT m.* FROM menu m JOIN groups g ON g.id=m.group_id WHERE m.id IN (SELECT value FROM json_each(?)) AND m.active=1 AND m.ran_out=0 AND g.active=1 AND m.deleted_at IS NULL AND g.deleted_at IS NULL ORDER BY m.id",
+          )
+          .all(JSON.stringify(input.items.map((x) => x.id)));
+        const lines = input.items.map((x) => {
+          const row = available.find((candidate) => candidate.id === x.id);
+          if (!row) fail(409, "An item is unavailable. Refresh the menu.");
+          return {
+            itemId: row.id,
+            code: row.code,
+            name: row.name,
+            price: row.price,
+            quantity: x.quantity,
+          };
+        });
+        const amounts = orderTotals(
+          [
+            ...order.items,
+            ...lines,
+            ...input.customItems.map((x) => ({
+              ...x,
+              itemId: 0,
+              code: "CUSTOM",
+            })),
+          ],
+          order.restaurant,
+        );
+        const now = new Date().toISOString();
+        for (const line of lines)
+          await db
+            .prepare(
+              "INSERT INTO order_items(order_id,item_id,code,name,price,quantity) VALUES(?,?,?,?,?,?)",
+            )
+            .run(
+              order.id,
+              line.itemId,
+              line.code,
+              line.name,
+              line.price,
+              line.quantity,
+            );
+        for (const line of input.customItems)
+          await db
+            .prepare(
+              "INSERT INTO order_custom_items(order_id,name,price,quantity,actor,created_at) VALUES(?,?,?,?,?,?)",
+            )
+            .run(
+              order.id,
+              line.name,
+              line.price,
+              line.quantity,
+              u.username,
+              now,
+            );
+        await db
+          .prepare("UPDATE orders SET amounts=?,version=version+1 WHERE id=?")
+          .run(JSON.stringify(amounts), order.id);
+        await audit(u.username, "order.items.add", {
+          id: order.id,
+          menuItems: lines.length,
+          customItems: input.customItems.length,
+        });
+        return await getOrder(order.id);
+      }),
+    );
   });
   app.post("/api/admin/orders/:id/messages", async (req, res) => {
     const u = await staff(req);
@@ -780,8 +1108,16 @@ export async function handleApi(request: globalThis.Request, env: Env) {
             .prepare(
               "SELECT m.id FROM menu m JOIN groups g ON g.id=m.group_id WHERE m.id IN (SELECT value FROM json_each(?)) AND m.active=1 AND m.ran_out=0 AND g.active=1 AND m.deleted_at IS NULL AND g.deleted_at IS NULL ORDER BY m.id",
             )
-            .all(JSON.stringify(o.items.map((line) => line.itemId)));
-          if (available.length !== o.items.length)
+            .all(
+              JSON.stringify(
+                o.items
+                  .filter((line) => !line.custom)
+                  .map((line) => line.itemId),
+              ),
+            );
+          if (
+            available.length !== o.items.filter((line) => !line.custom).length
+          )
             fail(409, "An item is unavailable; this order cannot be reopened.");
         }
         const now = new Date().toISOString();

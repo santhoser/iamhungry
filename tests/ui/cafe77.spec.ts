@@ -1,4 +1,7 @@
 import { test, expect } from "@playwright/test";
+import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { unzipSync } from "fflate";
 test("owner deletion uses app confirmations and linked groups stay protected", async ({
   browser,
 }) => {
@@ -23,9 +26,7 @@ test("owner deletion uses app confirmations and linked groups stay protected", a
     page.getByRole("heading", { name: "Overview", exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Open staff navigation" }).click();
-  await page
-    .getByRole("button", { name: "Menu & availability", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Manage menu", exact: true }).click();
   await expect(
     page.getByRole("button", {
       name: "Delete group Coffee & tea",
@@ -292,11 +293,9 @@ test("cashier stock controls and narrow staff layout", async ({ browser }) => {
   await expect(
     p.getByRole("button", { name: "Restaurant settings", exact: true }),
   ).toHaveCount(0);
-  await p
-    .getByRole("button", { name: "Menu & availability", exact: true })
-    .click();
+  await p.getByRole("button", { name: "Manage menu", exact: true }).click();
   await expect(
-    p.getByRole("heading", { name: "Menu & availability", exact: true }),
+    p.getByRole("heading", { name: "Manage menu", exact: true }),
   ).toBeVisible();
   const row = p.locator(".admin-menu-row").filter({ hasText: "Filter coffee" });
   await row.getByRole("checkbox", { name: "Available", exact: true }).uncheck();
@@ -405,4 +404,225 @@ test("counter order, customer conversation, and Excel history export", async ({
   expect((await download).suggestedFilename()).toMatch(/\.xlsx$/);
   await customer.close();
   await staff.close();
+});
+
+test("owner menu report and counter-only fee can be added to an open bill", async ({
+  browser,
+}) => {
+  const page = await browser.newPage();
+  await page.goto("/admin");
+  await page.getByLabel("Username", { exact: true }).fill("reviewowner");
+  await page
+    .getByLabel("Password", { exact: true })
+    .fill("Browser-Test-Password-42");
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByRole("button", { name: "Manage menu", exact: true }).click();
+  await page.getByRole("button", { name: "New group" }).click();
+  const groupDialog = page.getByRole("dialog", { name: "Edit menu group" });
+  await groupDialog.getByLabel("Group name").fill("Browser counter fees");
+  await groupDialog.getByRole("checkbox", { name: /Counter only/ }).check();
+  await groupDialog.getByRole("button", { name: "Save group" }).click();
+  await page.getByRole("button", { name: "Add item" }).click();
+  const itemDialog = page.getByRole("dialog", { name: "Edit menu item" });
+  await itemDialog
+    .getByLabel("Name", { exact: true })
+    .fill("Browser service fee");
+  await itemDialog.getByLabel("Item code").fill("BROWSER-FEE");
+  await itemDialog
+    .getByRole("combobox", { name: "Group" })
+    .selectOption({ label: "Browser counter fees" });
+  await itemDialog.getByLabel("Price (₹)").fill("7.50");
+  await itemDialog.getByRole("button", { name: "Save menu item" }).click();
+  const feeRow = page
+    .locator(".admin-menu-row")
+    .filter({ hasText: "Browser service fee" });
+  await feeRow.getByRole("button", { name: "Edit", exact: true }).click();
+  await itemDialog.getByLabel("Price (₹)").fill("8.25");
+  await itemDialog
+    .getByLabel("Comment on this change (optional)")
+    .fill("Browser price review");
+  await itemDialog.getByRole("button", { name: "Save menu item" }).click();
+  await page.getByRole("button", { name: "Menu reports" }).click();
+  await page.getByLabel("Search menu history").fill("BROWSER-FEE");
+  await page.getByRole("checkbox", { name: "Price changes" }).check();
+  await expect(page.getByText("Browser price review")).toBeVisible();
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export to Excel" }).click();
+  expect((await download).suggestedFilename()).toMatch(/menu-history.*\.xlsx$/);
+  await page
+    .getByRole("button", { name: "Current orders", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Add order" }).click();
+  const createDialog = page.getByRole("dialog", { name: "Add counter order" });
+  await createDialog.getByLabel("Customer name").fill("Browser fee guest");
+  await createDialog
+    .getByLabel("Find item by code or name")
+    .fill("BROWSER-FEE");
+  await createDialog
+    .getByRole("listbox", { name: "Matching menu items" })
+    .getByRole("button", { name: "Add Browser service fee" })
+    .click();
+  await createDialog.getByLabel("Item or fee name").fill("Custom parcel fee");
+  await createDialog.getByLabel("Price (₹)").fill("2.25");
+  await createDialog.getByRole("button", { name: "Add custom item" }).click();
+  await createDialog.getByRole("button", { name: "Create order" }).click();
+  const orderDialog = page.getByRole("dialog", { name: /^Order c77-/ });
+  await expect(orderDialog.getByText("Custom parcel fee")).toBeVisible();
+  await orderDialog.getByRole("button", { name: "Add items or fees" }).click();
+  const addDialog = page.getByRole("dialog", { name: "Add items to order" });
+  await addDialog.getByLabel("Item or fee name").fill("Late service fee");
+  await addDialog.getByLabel("Price (₹)").fill("1.00");
+  await addDialog.getByRole("button", { name: "Add custom item" }).click();
+  await addDialog.getByRole("button", { name: "Add to order" }).click();
+  await expect(orderDialog.getByText("Late service fee")).toBeVisible();
+  await page.close();
+});
+
+test("tags filter customer items and visible counter-only items require a counter visit", async ({ browser }) => {
+  const page = await browser.newPage();
+  await page.goto("/admin");
+  await page.getByLabel("Username", { exact: true }).fill("reviewowner");
+  await page.getByLabel("Password", { exact: true }).fill("Browser-Test-Password-42");
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByRole("button", { name: "Manage menu", exact: true }).click();
+  await page.getByRole("button", { name: "Tags", exact: true }).click();
+  const tags = page.getByRole("dialog", { name: "Manage tags" });
+  await tags.getByRole("button", { name: "Add tag" }).click();
+  await tags.getByLabel("Tag name").fill("Browser Eggless");
+  await tags.getByRole("button", { name: "Save tag" }).click();
+  await expect(tags.getByText("Browser Eggless")).toBeVisible();
+  await tags.getByRole("button", { name: "Close tags" }).click();
+  const itemRow = page.locator(".admin-menu-row").filter({ hasText: "Cake of the day" });
+  await itemRow.getByRole("button", { name: "Edit", exact: true }).click();
+  const itemDialog = page.getByRole("dialog", { name: "Edit menu item" });
+  await itemDialog.getByRole("checkbox", { name: "Browser Eggless" }).check();
+  await itemDialog.getByRole("button", { name: "Save menu item" }).click();
+  await page.getByRole("button", { name: "New group" }).click();
+  const groupDialog = page.getByRole("dialog", { name: "Edit menu group" });
+  await groupDialog.getByLabel("Group name").fill("Browser visible fees");
+  await groupDialog.getByRole("checkbox", { name: "Counter only", exact: true }).check();
+  await groupDialog.getByRole("checkbox", { name: /Show at customer menu/ }).check();
+  await groupDialog.getByRole("button", { name: "Save group" }).click();
+  await page.getByRole("button", { name: "Add item" }).click();
+  await itemDialog.getByLabel("Name", { exact: true }).fill("Browser visible fee");
+  await itemDialog.getByLabel("Item code").fill("BROWSER-VISIBLE-FEE");
+  await itemDialog.getByRole("combobox", { name: "Group" }).selectOption({ label: "Browser visible fees" });
+  await itemDialog.getByLabel("Price (₹)").fill("3.00");
+  await itemDialog.getByRole("button", { name: "Save menu item" }).click();
+  const customer = await browser.newPage();
+  await customer.goto("/");
+  await customer.getByRole("textbox", { name: "Search menu" }).fill("Browser Eggless");
+  await expect(customer.getByRole("button", { name: "Cake of the day", exact: true })).toBeVisible();
+  await customer.getByRole("textbox", { name: "Search menu" }).fill("Browser visible fee");
+  const feeCard = customer.locator(".product").filter({ hasText: "Browser visible fee" });
+  await expect(feeCard.getByText("Please visit the counter")).toBeVisible();
+  await expect(feeCard.getByRole("button", { name: "Add", exact: true })).toHaveCount(0);
+  await customer.close();
+  await page.close();
+});
+
+test("order history status filters and polling stay scoped to current orders", async ({
+  browser,
+}) => {
+  const page = await browser.newPage();
+  await page.goto("/admin");
+  await page.getByLabel("Username", { exact: true }).fill("reviewowner");
+  await page
+    .getByLabel("Password", { exact: true })
+    .fill("Browser-Test-Password-42");
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
+  async function post(path: string, body: unknown) {
+    return page.evaluate(
+      async ({ path, body }) => {
+        const response = await fetch("/api" + path, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        return { status: response.status, data: await response.json() };
+      },
+      { path, body },
+    );
+  }
+  async function create(name: string) {
+    const response = await post("/admin/orders", {
+      table: 1,
+      name,
+      requestKey: randomUUID(),
+      items: [],
+      customItems: [{ name: "Test fee", price: 100, quantity: 1 }],
+    });
+    expect(response.status).toBe(201);
+    return response.data.order;
+  }
+  const newOrder = await create("History new guest");
+  const acceptedOrder = await create("History accepted guest");
+  const accepted = await post(`/admin/orders/${acceptedOrder.id}/status`, {
+    status: "Accepted",
+    version: acceptedOrder.version,
+  });
+  expect(accepted.status).toBe(200);
+  const requests = { orders: 0, details: 0, menu: 0 };
+  page.on("request", (request) => {
+    const path = new URL(request.url()).pathname;
+    if (path === "/api/admin/orders") requests.orders++;
+    if (/^\/api\/admin\/orders\/\d+$/.test(path)) requests.details++;
+    if (path === "/api/admin/menu") requests.menu++;
+  });
+  await page
+    .getByRole("button", { name: "Order history", exact: true })
+    .click();
+  const filters = page.locator(".order-status-filters");
+  await filters.getByRole("checkbox", { name: "New" }).check();
+  await expect(
+    page.locator(".order-row").filter({ hasText: "History new guest" }),
+  ).toBeVisible();
+  await expect(
+    page.locator(".order-row").filter({ hasText: "History accepted guest" }),
+  ).toHaveCount(0);
+  await filters.getByRole("checkbox", { name: "Accepted" }).check();
+  await expect(
+    page.locator(".order-row").filter({ hasText: "History accepted guest" }),
+  ).toBeVisible();
+  await filters.getByRole("checkbox", { name: "New" }).uncheck();
+  await expect(
+    page.locator(".order-row").filter({ hasText: "History new guest" }),
+  ).toHaveCount(0);
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export to Excel" }).click();
+  const downloaded = await download;
+  const workbook = unzipSync(readFileSync(await downloaded.path()));
+  const sheet = new TextDecoder().decode(workbook["xl/worksheets/sheet1.xml"]);
+  expect(sheet).toContain(acceptedOrder.number);
+  expect(sheet).not.toContain(newOrder.number);
+  await page
+    .locator(".order-row")
+    .filter({ hasText: "History accepted guest" })
+    .click();
+  await expect(
+    page.getByRole("dialog", { name: `Order ${acceptedOrder.number}` }),
+  ).toBeVisible();
+  const historyCalls = { ...requests };
+  await page.waitForTimeout(5500);
+  expect(requests.orders).toBe(historyCalls.orders);
+  expect(requests.details).toBe(historyCalls.details);
+  await page.getByRole("button", { name: "Close order" }).click();
+  await page.getByRole("button", { name: "Manage menu", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Manage menu" }),
+  ).toBeVisible();
+  const menuCalls = requests.menu;
+  await page.waitForTimeout(5500);
+  expect(requests.menu).toBe(menuCalls);
+  await page
+    .getByRole("button", { name: "Current orders", exact: true })
+    .click();
+  await expect(
+    page.locator(".order-row").filter({ hasText: "History new guest" }),
+  ).toBeVisible();
+  const currentCalls = requests.orders;
+  await page.waitForTimeout(5500);
+  expect(requests.orders).toBeGreaterThan(currentCalls);
+  await page.close();
 });

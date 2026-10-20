@@ -140,6 +140,14 @@ function Menu() {
       </div>
     );
   const { config, items, groups, table } = data;
+  const counterOnly = (item: MenuItem) =>
+    !!groups.find((group) => group.id === item.groupId)?.counterOnly;
+  const selectTag = (name: string) => {
+    setCategory(0);
+    setQuery(name);
+    setDetail(null);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
   const lines = Object.entries(cart)
     .filter(([, q]) => q > 0)
     .map(([id, quantity]) => ({
@@ -159,6 +167,9 @@ function Menu() {
       (!category || i.groupId === category) &&
       (!query ||
         i.name.toLowerCase().includes(query.toLowerCase()) ||
+        i.tags.some((tag) =>
+          tag.name.toLowerCase().includes(query.toLowerCase()),
+        ) ||
         (config.menuCodeSearch &&
           i.code.toLowerCase().includes(query.toLowerCase()))),
   );
@@ -207,9 +218,26 @@ function Menu() {
           {i.name}
         </button>
         <p>{i.details}</p>
+        {!!i.tags.length && (
+          <div className="item-tags">
+            {i.tags.map((tag) => (
+              <button
+                type="button"
+                className="item-tag"
+                key={tag.id}
+                onClick={() => selectTag(tag.name)}
+              >
+                {tag.image && <img src={tag.image} alt="" />}
+                {tag.name}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="product-bottom">
           <strong>{money(i.price)}</strong>
-          {i.ranOut ? (
+          {counterOnly(i) ? (
+            <span className="counter-visit">Please visit the counter</span>
+          ) : i.ranOut ? (
             <span className="muted">Sold out</span>
           ) : cart[i.id] ? (
             <div className="quantity">
@@ -452,6 +480,21 @@ function Menu() {
               </span>
               <h2>{detail.name}</h2>
               <p>{detail.details}</p>
+              {!!detail.tags.length && (
+                <div className="item-tags">
+                  {detail.tags.map((tag) => (
+                    <button
+                      type="button"
+                      className="item-tag"
+                      key={tag.id}
+                      onClick={() => selectTag(tag.name)}
+                    >
+                      {tag.image && <img src={tag.image} alt="" />}
+                      {tag.name}
+                    </button>
+                  ))}
+                </div>
+              )}
               {detail.calories && (
                 <p>
                   <strong>Calories / nutrition:</strong> {detail.calories}
@@ -477,17 +520,23 @@ function Menu() {
               )}
               <div className="product-bottom">
                 <strong>{money(detail.price)}</strong>
-                <button
-                  className="btn"
-                  disabled={detail.ranOut}
-                  onClick={() => {
-                    change(detail.id, 1);
-                    setDetail(null);
-                  }}
-                >
-                  {detail.ranOut ? "Out of stock" : "Add to order"}{" "}
-                  <Plus size={16} />
-                </button>
+                {counterOnly(detail) ? (
+                  <span className="counter-visit">
+                    Please visit the counter
+                  </span>
+                ) : (
+                  <button
+                    className="btn"
+                    disabled={detail.ranOut}
+                    onClick={() => {
+                      change(detail.id, 1);
+                      setDetail(null);
+                    }}
+                  >
+                    {detail.ranOut ? "Out of stock" : "Add to order"}{" "}
+                    <Plus size={16} />
+                  </button>
+                )}
               </div>
             </div>
           </section>
@@ -537,6 +586,9 @@ function Menu() {
                             ? money(l.item.price)
                             : "Please remove this item"}
                           {l.item?.ranOut ? " · Out of stock" : ""}
+                          {l.item && counterOnly(l.item)
+                            ? " · Please visit the counter"
+                            : ""}
                         </small>
                       </div>
                       <div className="quantity">
@@ -552,7 +604,11 @@ function Menu() {
                         <button
                           type="button"
                           disabled={
-                            busy || !l.item || l.item.ranOut || l.quantity >= 50
+                            busy ||
+                            !l.item ||
+                            l.item.ranOut ||
+                            counterOnly(l.item) ||
+                            l.quantity >= 50
                           }
                           onClick={() => change(l.id, 1)}
                           aria-label={"Add " + l.item?.name}
@@ -646,7 +702,9 @@ function Menu() {
                   disabled={
                     busy ||
                     !table ||
-                    lines.some((l) => !l.item || l.item.ranOut)
+                    lines.some(
+                      (l) => !l.item || l.item.ranOut || counterOnly(l.item),
+                    )
                   }
                   type="submit"
                 >
@@ -800,8 +858,8 @@ function Tracking({ token }: { token: string }) {
             </span>
           </div>
           <div className="tracking-items">
-            {order.items.map((i) => (
-              <div key={i.itemId}>
+            {order.items.map((i, lineIndex) => (
+              <div key={`${i.itemId}-${lineIndex}`}>
                 <span>
                   <b>{i.quantity} ×</b> {i.name}
                 </span>
@@ -936,8 +994,8 @@ export function Receipt({
           </p>
           <p>Customer: {order.name}</p>
           <div className="tracking-items">
-            {order.items.map((i) => (
-              <div key={i.itemId}>
+            {order.items.map((i, lineIndex) => (
+              <div key={`${i.itemId}-${lineIndex}`}>
                 <span>
                   {i.name}
                   <small>

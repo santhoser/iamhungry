@@ -292,6 +292,7 @@ test("existing database migration retains rows and is safe to run again", () => 
     ).run(1, "EX1", "Existing item", 11000);
     for (const table of ["tables", "groups", "menu"])
       db.exec(`ALTER TABLE ${table} DROP COLUMN deleted_at`);
+    db.exec("ALTER TABLE groups DROP COLUMN counter_only");
     db.close();
     db = openDatabase(path);
     assert.equal(
@@ -322,6 +323,23 @@ test("existing database migration retains rows and is safe to run again", () => 
           .all()
           .some((c) => c.name === "deleted_at"),
       );
+    assert.equal(
+      (
+        db
+          .prepare(
+            "SELECT counter_only FROM groups WHERE name='Existing group'",
+          )
+          .get() as any
+      ).counter_only,
+      0,
+    );
+    assert.ok(
+      db
+        .prepare(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='menu_history'",
+        )
+        .get(),
+    );
     db.close();
     db = openDatabase(path);
     assert.equal(

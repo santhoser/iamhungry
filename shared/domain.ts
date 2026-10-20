@@ -35,7 +35,14 @@ export interface Group {
   image: string;
   active: boolean;
   sort: number;
+  counterOnly: boolean;
+  customerVisible: boolean;
   linkedItemCount?: number;
+}
+export interface Tag {
+  id: number;
+  name: string;
+  image: string;
 }
 export interface MenuItem {
   id: number;
@@ -54,6 +61,7 @@ export interface MenuItem {
   ranOut: boolean;
   todaySpecial: boolean;
   dashboardFav: boolean;
+  tags: Tag[];
 }
 export interface Totals {
   subtotal: number;
@@ -124,6 +132,36 @@ export interface OrderLine {
   name: string;
   price: number;
   quantity: number;
+  custom?: boolean;
+}
+export interface CustomOrderItem {
+  name: string;
+  price: number; // Integer paise.
+  quantity: number;
+}
+export interface MenuHistoryEntry {
+  id: number;
+  menuItemId: number;
+  itemCode: string;
+  itemName: string;
+  changedAt: string;
+  actor: string;
+  changeType: "created" | "updated" | "stock" | "deleted";
+  systemComments: string;
+  userComments: string;
+  isPriceChange: boolean;
+  oldPrice: number | null;
+  newPrice: number | null;
+  oldRanOut: boolean | null;
+  newRanOut: boolean | null;
+  oldTodaySpecial: boolean | null;
+  newTodaySpecial: boolean | null;
+  oldDashboardFav: boolean | null;
+  newDashboardFav: boolean | null;
+  oldActive: boolean | null;
+  newActive: boolean | null;
+  before: MenuItem | null;
+  after: MenuItem | null;
 }
 export interface Order {
   id: number;

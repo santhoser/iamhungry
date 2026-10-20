@@ -28,6 +28,24 @@ export function openWorkersDatabase() {
       "utf8",
     ),
   );
+  db.exec(
+    readFileSync(
+      new URL(
+        "../../migrations/0005_menu_history_counter_orders.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
+  db.exec(
+    readFileSync(
+      new URL(
+        "../../migrations/0006_tags_counter_visibility.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
   seed(db);
   return db;
 }
