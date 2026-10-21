@@ -35,6 +35,7 @@ await db.exec(
 await db.exec(
   readFileSync("migrations/0006_tags_counter_visibility.sql", "utf8"),
 );
+await db.exec(readFileSync("migrations/0007_admin_role.sql", "utf8"));
 await db.exec(
   readFileSync("cloudflare/seed-demo.sql", "utf8")
     .split("\n")
@@ -51,6 +52,19 @@ const setup = await mf.dispatchFetch("http://127.0.0.1:5176/api/setup", {
   }),
 });
 if (!setup.ok) throw Error(await setup.text());
+const adminSetup = await mf.dispatchFetch(
+  "http://127.0.0.1:5176/api/setup/admin",
+  {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      token,
+      username: "reviewadmin",
+      password: "Admin-Test-Password-42",
+    }),
+  },
+);
+if (!adminSetup.ok) throw Error(await adminSetup.text());
 const login = await mf.dispatchFetch("http://127.0.0.1:5176/api/auth/login", {
   method: "POST",
   headers: { "Content-Type": "application/json" },

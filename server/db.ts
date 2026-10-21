@@ -65,6 +65,13 @@ export function openDatabase(
     CREATE INDEX IF NOT EXISTS payments_order ON payments(order_id);
     CREATE INDEX IF NOT EXISTS items_order ON order_items(order_id);
   `);
+  if (
+    !db
+      .prepare("PRAGMA table_info(users)")
+      .all()
+      .some((column) => column.name === "is_admin")
+  )
+    db.exec("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0");
   // Upgrade existing local databases without removing historical rows.
   transaction(db, () => {
     for (const table of ["tables", "groups", "menu"]) {

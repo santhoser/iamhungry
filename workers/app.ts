@@ -46,6 +46,7 @@ const fail = (status: number, message: string): never => {
   throw new HttpError(status, message);
 };
 const username = z.string().regex(/^[a-zA-Z0-9._-]{3,40}$/);
+const newPassword = z.string().min(8).max(128);
 const safeImage = z
   .string()
   .max(2000)
@@ -173,7 +174,7 @@ export async function handleApi(request: globalThis.Request, env: Env) {
     const user = token
       ? await db
           .prepare(
-            "SELECT u.id,u.username,u.role FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=? AND s.expires>? AND u.active=1",
+            "SELECT u.id,u.username,CASE WHEN u.is_admin=1 THEN 'admin' ELSE u.role END AS role FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=? AND s.expires>? AND u.active=1",
           )
           .get(await digest(token), Date.now())
       : null;
@@ -181,12 +182,12 @@ export async function handleApi(request: globalThis.Request, env: Env) {
     return user as {
       id: number;
       username: string;
-      role: "owner" | "cashier";
+      role: "admin" | "owner" | "cashier";
     };
   }
   const owner = async (req: Request) => {
     const user = await staff(req);
-    if (user.role !== "owner") fail(403, "Owner access required");
+    if (user.role === "cashier") fail(403, "Owner access required");
     return user;
   };
   app.get("/api/admin/events", async (req, res) => {
@@ -513,7 +514,11 @@ export async function handleApi(request: globalThis.Request, env: Env) {
       maxAge: 8 * 3600000,
       path: "/",
     });
-    res.json({ id: u.id, username: u.username, role: u.role });
+    res.json({
+      id: u.id,
+      username: u.username,
+      role: u.is_admin ? "admin" : u.role,
+    });
   });
   app.post("/api/auth/logout", async (req, res) => {
     const u = await staff(req);
@@ -534,19 +539,42 @@ export async function handleApi(request: globalThis.Request, env: Env) {
       .object({
         token: z.string(),
         username,
-        password: z.string().min(12).max(128),
+        password: newPassword,
       })
       .parse(req.body);
     if (
       !options.setupToken ||
       (await digest(input.token)) !== (await digest(options.setupToken)) ||
-      (await db.prepare("SELECT id FROM users WHERE role='owner'").get())
+      (await db
+        .prepare("SELECT id FROM users WHERE role='owner' AND is_admin=0")
+        .get())
     )
       fail(403, "Setup link unavailable");
     await db
       .prepare("INSERT INTO users(username,password,role) VALUES(?,?,?)")
       .run(input.username, await hashPassword(input.password), "owner");
     await audit(input.username, "owner.setup", {});
+    res.json({ ok: true });
+  });
+  app.post("/api/setup/admin", async (req, res) => {
+    const input = z
+      .object({ token: z.string(), username, password: newPassword })
+      .parse(req.body);
+    if (
+      !options.setupToken ||
+      (await digest(input.token)) !== (await digest(options.setupToken))
+    )
+      fail(403, "Admin setup link unavailable");
+    await transaction(db, async () => {
+      if (await db.prepare("SELECT id FROM users WHERE is_admin=1").get())
+        fail(403, "Admin setup link unavailable");
+      await db
+        .prepare(
+          "INSERT INTO users(username,password,role,is_admin) VALUES(?,?,?,1)",
+        )
+        .run(input.username, await hashPassword(input.password), "owner");
+      await audit(input.username, "admin.setup", {});
+    });
     res.json({ ok: true });
   });
   app.get("/api/admin/menu", async (req, res) => {
@@ -1291,11 +1319,13 @@ export async function handleApi(request: globalThis.Request, env: Env) {
     res.json(c);
   });
   app.get("/api/admin/users", async (req, res) => {
-    await owner(req);
+    const u = await owner(req);
     res.json(
       await db
-        .prepare("SELECT id,username,role,active FROM users ORDER BY id")
-        .all(),
+        .prepare(
+          "SELECT id,username,CASE WHEN is_admin=1 THEN 'admin' ELSE role END AS role,active FROM users WHERE is_admin=0 OR ?='admin' ORDER BY id",
+        )
+        .all(u.role),
     );
   });
   app.post("/api/admin/users", async (req, res) => {
@@ -1303,13 +1333,22 @@ export async function handleApi(request: globalThis.Request, env: Env) {
     const v = z
       .object({
         username,
-        password: z.string().min(12).max(128),
-        role: z.enum(["owner", "cashier"]),
+        password: newPassword,
+        role: z.enum(["admin", "owner", "cashier"]),
       })
       .parse(req.body);
+    if (v.role === "admin" && u.role !== "admin")
+      fail(403, "Admin access required");
     await db
-      .prepare("INSERT INTO users(username,password,role) VALUES(?,?,?)")
-      .run(v.username, await hashPassword(v.password), v.role);
+      .prepare(
+        "INSERT INTO users(username,password,role,is_admin) VALUES(?,?,?,?)",
+      )
+      .run(
+        v.username,
+        await hashPassword(v.password),
+        v.role === "admin" ? "owner" : v.role,
+        +(v.role === "admin"),
+      );
     await audit(u.username, "user.create", {
       username: v.username,
       role: v.role,
@@ -1322,22 +1361,33 @@ export async function handleApi(request: globalThis.Request, env: Env) {
     const v = z
       .object({
         active: z.boolean(),
-        password: z.string().min(12).max(128).optional(),
+        password: newPassword.optional(),
       })
       .parse(req.body);
     if (id === u.id && !v.active)
       fail(400, "You cannot deactivate your own account");
     const target: any = await db
-      .prepare("SELECT id,role FROM users WHERE id=?")
+      .prepare(
+        "SELECT id,CASE WHEN is_admin=1 THEN 'admin' ELSE role END AS role FROM users WHERE id=?",
+      )
       .get(id);
-    if (!target) fail(404, "User not found");
+    if (!target || (target.role === "admin" && u.role !== "admin"))
+      fail(404, "User not found");
     if (!v.active && target.role === "owner") {
       const n: any = await db
         .prepare(
-          "SELECT count(*) AS n FROM users WHERE role='owner' AND active=1 AND id<>?",
+          "SELECT count(*) AS n FROM users WHERE role='owner' AND is_admin=0 AND active=1 AND id<>?",
         )
         .get(id);
       if (!n.n) fail(400, "Keep at least one active owner");
+    }
+    if (!v.active && target.role === "admin") {
+      const n: any = await db
+        .prepare(
+          "SELECT count(*) AS n FROM users WHERE is_admin=1 AND active=1 AND id<>?",
+        )
+        .get(id);
+      if (!n.n) fail(400, "Keep at least one active admin");
     }
     await db.prepare("UPDATE users SET active=? WHERE id=?").run(+v.active, id);
     if (v.password)

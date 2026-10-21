@@ -147,6 +147,9 @@ export default function Admin() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [login, setLogin] = useState({ username: "", password: "" });
   const setupToken = new URLSearchParams(location.search).get("setup");
+  const setupAdminToken = new URLSearchParams(location.search).get(
+    "setup-admin",
+  );
   const [orders, setOrders] = useState<Order[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -240,7 +243,7 @@ export default function Admin() {
       api<Staff>("/auth/me")
         .then((u) => {
           setUser(u);
-          setTab(u.role === "owner" ? "dashboard" : "orders");
+          setTab(u.role === "cashier" ? "orders" : "dashboard");
         })
         .catch(() => {}),
     ])
@@ -536,23 +539,36 @@ export default function Admin() {
             ← Back to the menu
           </a>
           <span className="eyebrow red">CAFE77 STAFF</span>
-          <h2>{setupToken ? "Welcome, owner" : "Welcome back"}</h2>
+          <h2>
+            {setupAdminToken
+              ? "Welcome, admin"
+              : setupToken
+                ? "Welcome, owner"
+                : "Welcome back"}
+          </h2>
           <p>
-            {setupToken
-              ? "Create your first owner account."
-              : "Sign in to look after your cafe."}
+            {setupAdminToken
+              ? "Create the first admin account."
+              : setupToken
+                ? "Create your first owner account."
+                : "Sign in to look after your cafe."}
           </p>
           <form
             onSubmit={(e) => {
               e.preventDefault();
               run(async () => {
-                if (setupToken) {
-                  await api("/setup", "POST", { ...login, token: setupToken });
+                if (setupToken || setupAdminToken) {
+                  await api(
+                    setupAdminToken ? "/setup/admin" : "/setup",
+                    "POST",
+                    { ...login, token: setupAdminToken || setupToken },
+                  );
                   history.replaceState(null, "", "/admin");
                 }
                 const u = await api<Staff>("/auth/login", "POST", login);
                 setUser(u);
-                setTab(u.role === "owner" ? "dashboard" : "orders");
+                setNewUser({ username: "", password: "", role: "cashier" });
+                setTab(u.role === "cashier" ? "orders" : "dashboard");
                 setLogin({ username: "", password: "" });
               });
             }}
@@ -572,9 +588,13 @@ export default function Admin() {
               <input
                 required
                 type="password"
-                minLength={setupToken ? 12 : 1}
+                minLength={setupToken || setupAdminToken ? 8 : 1}
                 maxLength={128}
-                autoComplete={setupToken ? "new-password" : "current-password"}
+                autoComplete={
+                  setupToken || setupAdminToken
+                    ? "new-password"
+                    : "current-password"
+                }
                 value={login.password}
                 onChange={(e) =>
                   setLogin((l) => ({ ...l, password: e.target.value }))
@@ -589,16 +609,19 @@ export default function Admin() {
             <button className="btn full" disabled={busy}>
               {busy
                 ? "Please wait…"
-                : setupToken
-                  ? "Create owner & sign in"
-                  : "Sign in"}
+                : setupAdminToken
+                  ? "Create admin & sign in"
+                  : setupToken
+                    ? "Create owner & sign in"
+                    : "Sign in"}
               <ArrowRight size={17} />
             </button>
           </form>
-          <p className="muted">Owner and cashier access · Cafe77</p>
+          <p className="muted">Admin, owner and cashier access · Cafe77</p>
         </section>
       </main>
     );
+  const canManage = user.role !== "cashier";
   const title =
     tab === "menuReports"
       ? "Menu reports"
@@ -632,7 +655,7 @@ export default function Admin() {
         <span className="sidebar-label">YOUR CAFE, AT A GLANCE</span>
         <nav>
           {nav
-            .filter((n) => !("owner" in n) || user.role === "owner")
+            .filter((n) => !("owner" in n) || canManage)
             .map((n) => (
               <button
                 key={n.id}
@@ -662,6 +685,7 @@ export default function Admin() {
                 run(async () => {
                   await api("/auth/logout", "POST", {});
                   setUser(null);
+                  setNewUser({ username: "", password: "", role: "cashier" });
                   setSelected(null);
                 })
               }
@@ -1039,7 +1063,7 @@ export default function Admin() {
                 <span>
                   {menu.items.length} menu items · {menu.groups.length} groups
                 </span>
-                {user.role === "owner" && (
+                {canManage && (
                   <div>
                     <button
                       className="btn secondary"
@@ -1094,7 +1118,7 @@ export default function Admin() {
                         <span className="status">Counter only</span>
                       )}
                     </h3>
-                    {user.role === "owner" && (
+                    {canManage && (
                       <div className="group-actions">
                         <button
                           className="text-button"
@@ -1183,7 +1207,7 @@ export default function Admin() {
                             }, "Availability updated")
                           }
                         />
-                        {user.role === "owner" && (
+                        {canManage && (
                           <>
                             <button
                               className="btn secondary small-btn"
@@ -1226,7 +1250,7 @@ export default function Admin() {
               ))}
             </>
           )}
-          {tab === "menuReports" && user.role === "owner" && (
+          {tab === "menuReports" && canManage && (
             <>
               <button className="text-button" onClick={() => navigate("menu")}>
                 ← Manage menu
@@ -1609,11 +1633,11 @@ export default function Admin() {
                       }
                     />
                   </Field>
-                  <Field label="Password (12+ characters)">
+                  <Field label="Password (8+ characters)">
                     <input
                       type="password"
                       required
-                      minLength={12}
+                      minLength={8}
                       maxLength={128}
                       autoComplete="new-password"
                       value={newUser.password}
@@ -1631,6 +1655,9 @@ export default function Admin() {
                     >
                       <option value="cashier">Cashier</option>
                       <option value="owner">Owner</option>
+                      {user.role === "admin" && (
+                        <option value="admin">Admin</option>
+                      )}
                     </select>
                   </Field>
                 </div>
@@ -1671,7 +1698,7 @@ export default function Admin() {
                       disabled={busy}
                       onClick={() => {
                         const password = window.prompt(
-                          "Enter a new password (12–128 characters). It is visible in this dialog.",
+                          "Enter a new password (8–128 characters). It is visible in this dialog.",
                         );
                         if (password)
                           run(async () => {

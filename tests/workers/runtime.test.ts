@@ -40,6 +40,33 @@ test("actual workerd/D1 runtime: setup, auth, atomic order/payment, uploads and 
       readFileSync("migrations/0006_tags_counter_visibility.sql", "utf8"),
     );
     await db.exec(
+      "INSERT INTO users(username,password,role) VALUES('legacyowner','hash','owner'); INSERT INTO sessions(token,user_id,expires) VALUES('legacy-session',1,9999999999999);",
+    );
+    await db.exec(readFileSync("migrations/0007_admin_role.sql", "utf8"));
+    assert.equal(
+      (
+        (await db
+          .prepare("SELECT username FROM users WHERE id=1")
+          .first()) as any
+      ).username,
+      "legacyowner",
+    );
+    assert.equal(
+      (
+        (await db
+          .prepare("SELECT user_id FROM sessions WHERE token='legacy-session'")
+          .first()) as any
+      ).user_id,
+      1,
+    );
+    assert.equal(
+      (await db.prepare("PRAGMA foreign_key_check").all()).results.length,
+      0,
+    );
+    await db.exec(
+      "DELETE FROM sessions WHERE token='legacy-session'; DELETE FROM users WHERE username='legacyowner';",
+    );
+    await db.exec(
       readFileSync("cloudflare/seed-demo.sql", "utf8")
         .split("\n")
         .filter((line) => !line.startsWith("--"))

@@ -1,4 +1,4 @@
-export type Role = "owner" | "cashier";
+export type Role = "admin" | "owner" | "cashier";
 export type Status =
   "New" | "Accepted" | "InProgress" | "Ready" | "Closed" | "Cancelled";
 export const transitions: Record<Status, Status[]> = {

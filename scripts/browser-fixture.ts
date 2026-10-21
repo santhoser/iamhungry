@@ -14,6 +14,9 @@ db.prepare("INSERT INTO users(username,password,role) VALUES(?,?,?)").run(
   hashPassword("Cashier-Test-Password-42"),
   "cashier",
 );
+db.prepare(
+  "INSERT INTO users(username,password,role,is_admin) VALUES(?,?,?,1)",
+).run("reviewadmin", hashPassword("Admin-Test-Password-42"), "owner");
 const app = createApp(db);
 const vite = await createServer({
   server: { middlewareMode: true, hmr: false },

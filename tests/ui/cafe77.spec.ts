@@ -478,11 +478,15 @@ test("owner menu report and counter-only fee can be added to an open bill", asyn
   await page.close();
 });
 
-test("tags filter customer items and visible counter-only items require a counter visit", async ({ browser }) => {
+test("tags filter customer items and visible counter-only items require a counter visit", async ({
+  browser,
+}) => {
   const page = await browser.newPage();
   await page.goto("/admin");
   await page.getByLabel("Username", { exact: true }).fill("reviewowner");
-  await page.getByLabel("Password", { exact: true }).fill("Browser-Test-Password-42");
+  await page
+    .getByLabel("Password", { exact: true })
+    .fill("Browser-Test-Password-42");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await page.getByRole("button", { name: "Manage menu", exact: true }).click();
   await page.getByRole("button", { name: "Tags", exact: true }).click();
@@ -492,31 +496,51 @@ test("tags filter customer items and visible counter-only items require a counte
   await tags.getByRole("button", { name: "Save tag" }).click();
   await expect(tags.getByText("Browser Eggless")).toBeVisible();
   await tags.getByRole("button", { name: "Close tags" }).click();
-  const itemRow = page.locator(".admin-menu-row").filter({ hasText: "Cake of the day" });
-  await itemRow.getByRole("button", { name: "Edit", exact: true }).click();
+  await page.getByRole("button", { name: "Add item" }).click();
   const itemDialog = page.getByRole("dialog", { name: "Edit menu item" });
+  await itemDialog.getByLabel("Name", { exact: true }).fill("Browser tagged item");
+  await itemDialog.getByLabel("Item code").fill("BROWSER-TAGGED-ITEM");
+  await itemDialog.getByLabel("Price (₹)").fill("4.00");
   await itemDialog.getByRole("checkbox", { name: "Browser Eggless" }).check();
   await itemDialog.getByRole("button", { name: "Save menu item" }).click();
   await page.getByRole("button", { name: "New group" }).click();
   const groupDialog = page.getByRole("dialog", { name: "Edit menu group" });
   await groupDialog.getByLabel("Group name").fill("Browser visible fees");
-  await groupDialog.getByRole("checkbox", { name: "Counter only", exact: true }).check();
-  await groupDialog.getByRole("checkbox", { name: /Show at customer menu/ }).check();
+  await groupDialog
+    .getByRole("checkbox", { name: "Counter only", exact: true })
+    .check();
+  await groupDialog
+    .getByRole("checkbox", { name: /Show at customer menu/ })
+    .check();
   await groupDialog.getByRole("button", { name: "Save group" }).click();
   await page.getByRole("button", { name: "Add item" }).click();
-  await itemDialog.getByLabel("Name", { exact: true }).fill("Browser visible fee");
+  await itemDialog
+    .getByLabel("Name", { exact: true })
+    .fill("Browser visible fee");
   await itemDialog.getByLabel("Item code").fill("BROWSER-VISIBLE-FEE");
-  await itemDialog.getByRole("combobox", { name: "Group" }).selectOption({ label: "Browser visible fees" });
+  await itemDialog
+    .getByRole("combobox", { name: "Group" })
+    .selectOption({ label: "Browser visible fees" });
   await itemDialog.getByLabel("Price (₹)").fill("3.00");
   await itemDialog.getByRole("button", { name: "Save menu item" }).click();
   const customer = await browser.newPage();
   await customer.goto("/");
-  await customer.getByRole("textbox", { name: "Search menu" }).fill("Browser Eggless");
-  await expect(customer.getByRole("button", { name: "Cake of the day", exact: true })).toBeVisible();
-  await customer.getByRole("textbox", { name: "Search menu" }).fill("Browser visible fee");
-  const feeCard = customer.locator(".product").filter({ hasText: "Browser visible fee" });
+  await customer
+    .getByRole("textbox", { name: "Search menu" })
+    .fill("Browser Eggless");
+  await expect(
+    customer.getByRole("button", { name: "Browser tagged item", exact: true }),
+  ).toBeVisible();
+  await customer
+    .getByRole("textbox", { name: "Search menu" })
+    .fill("Browser visible fee");
+  const feeCard = customer
+    .locator(".product")
+    .filter({ hasText: "Browser visible fee" });
   await expect(feeCard.getByText("Please visit the counter")).toBeVisible();
-  await expect(feeCard.getByRole("button", { name: "Add", exact: true })).toHaveCount(0);
+  await expect(
+    feeCard.getByRole("button", { name: "Add", exact: true }),
+  ).toHaveCount(0);
   await customer.close();
   await page.close();
 });
@@ -625,4 +649,37 @@ test("order history status filters and polling stay scoped to current orders", a
   await page.waitForTimeout(5500);
   expect(requests.orders).toBeGreaterThan(currentCalls);
   await page.close();
+});
+
+test("owner staff view hides admin accounts while admin can manage owners", async ({
+  browser,
+}) => {
+  const owner = await browser.newPage();
+  await owner.goto("/admin");
+  await owner.getByLabel("Username", { exact: true }).fill("reviewowner");
+  await owner
+    .getByLabel("Password", { exact: true })
+    .fill("Browser-Test-Password-42");
+  await owner.getByRole("button", { name: "Sign in", exact: true }).click();
+  await owner.getByRole("button", { name: "Staff accounts" }).click();
+  await expect(owner.getByRole("option", { name: "Admin" })).toHaveCount(0);
+  await expect(owner.getByText("reviewadmin")).toHaveCount(0);
+  await owner.close();
+  const admin = await browser.newPage();
+  await admin.goto("/admin");
+  await admin.getByLabel("Username", { exact: true }).fill("reviewadmin");
+  await admin
+    .getByLabel("Password", { exact: true })
+    .fill("Admin-Test-Password-42");
+  await admin.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(admin.getByRole("heading", { name: "Overview" })).toBeVisible();
+  await admin.getByRole("button", { name: "Staff accounts" }).click();
+  await expect(admin.getByRole("option", { name: "Admin" })).toHaveCount(1);
+  await expect(
+    admin.locator(".staff-row").filter({ hasText: "reviewadmin" }),
+  ).toBeVisible();
+  await expect(
+    admin.locator(".staff-row").filter({ hasText: "reviewowner" }),
+  ).toBeVisible();
+  await admin.close();
 });

@@ -52,6 +52,7 @@ const fail = (status: number, message: string): never => {
   throw new HttpError(status, message);
 };
 const username = z.string().regex(/^[a-zA-Z0-9._-]{3,40}$/);
+const newPassword = z.string().min(8).max(128);
 const safeImage = z
   .string()
   .max(2000)
@@ -228,16 +229,20 @@ export function createApp(
     const user = token
       ? db
           .prepare(
-            "SELECT u.id,u.username,u.role FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=? AND s.expires>? AND u.active=1",
+            "SELECT u.id,u.username,CASE WHEN u.is_admin=1 THEN 'admin' ELSE u.role END AS role FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=? AND s.expires>? AND u.active=1",
           )
           .get(digest(token), Date.now())
       : null;
     if (!user) fail(401, "Please sign in");
-    return user as { id: number; username: string; role: "owner" | "cashier" };
+    return user as {
+      id: number;
+      username: string;
+      role: "admin" | "owner" | "cashier";
+    };
   }
   const owner = (req: Request) => {
     const user = staff(req);
-    if (user.role !== "owner") fail(403, "Owner access required");
+    if (user.role === "cashier") fail(403, "Owner access required");
     return user;
   };
   app.get("/api/admin/events", (req, res) => {
@@ -577,7 +582,11 @@ export function createApp(
       maxAge: 8 * 3600000,
       path: "/",
     });
-    res.json({ id: u.id, username: u.username, role: u.role });
+    res.json({
+      id: u.id,
+      username: u.username,
+      role: u.is_admin ? "admin" : u.role,
+    });
   });
   app.post("/api/auth/logout", (req, res) => {
     const u = staff(req);
@@ -596,13 +605,13 @@ export function createApp(
       .object({
         token: z.string(),
         username,
-        password: z.string().min(12).max(128),
+        password: newPassword,
       })
       .parse(req.body);
     if (
       !options.setupToken ||
       digest(input.token) !== digest(options.setupToken) ||
-      db.prepare("SELECT id FROM users WHERE role='owner'").get()
+      db.prepare("SELECT id FROM users WHERE role='owner' AND is_admin=0").get()
     )
       fail(403, "Setup link unavailable");
     db.prepare("INSERT INTO users(username,password,role) VALUES(?,?,?)").run(
@@ -611,6 +620,22 @@ export function createApp(
       "owner",
     );
     audit(input.username, "owner.setup", {});
+    res.json({ ok: true });
+  });
+  app.post("/api/setup/admin", (req, res) => {
+    const input = z
+      .object({ token: z.string(), username, password: newPassword })
+      .parse(req.body);
+    if (
+      !options.setupToken ||
+      digest(input.token) !== digest(options.setupToken) ||
+      db.prepare("SELECT id FROM users WHERE is_admin=1").get()
+    )
+      fail(403, "Admin setup link unavailable");
+    db.prepare(
+      "INSERT INTO users(username,password,role,is_admin) VALUES(?,?,?,1)",
+    ).run(input.username, hashPassword(input.password), "owner");
+    audit(input.username, "admin.setup", {});
     res.json({ ok: true });
   });
   app.get("/api/admin/menu", (req, res) => {
@@ -1294,9 +1319,13 @@ export function createApp(
     res.json(c);
   });
   app.get("/api/admin/users", (req, res) => {
-    owner(req);
+    const u = owner(req);
     res.json(
-      db.prepare("SELECT id,username,role,active FROM users ORDER BY id").all(),
+      db
+        .prepare(
+          "SELECT id,username,CASE WHEN is_admin=1 THEN 'admin' ELSE role END AS role,active FROM users WHERE is_admin=0 OR ?='admin' ORDER BY id",
+        )
+        .all(u.role),
     );
   });
   app.post("/api/admin/users", (req, res) => {
@@ -1304,14 +1333,19 @@ export function createApp(
     const v = z
       .object({
         username,
-        password: z.string().min(12).max(128),
-        role: z.enum(["owner", "cashier"]),
+        password: newPassword,
+        role: z.enum(["admin", "owner", "cashier"]),
       })
       .parse(req.body);
-    db.prepare("INSERT INTO users(username,password,role) VALUES(?,?,?)").run(
+    if (v.role === "admin" && u.role !== "admin")
+      fail(403, "Admin access required");
+    db.prepare(
+      "INSERT INTO users(username,password,role,is_admin) VALUES(?,?,?,?)",
+    ).run(
       v.username,
       hashPassword(v.password),
-      v.role,
+      v.role === "admin" ? "owner" : v.role,
+      +(v.role === "admin"),
     );
     audit(u.username, "user.create", { username: v.username, role: v.role });
     res.json({ ok: true });
@@ -1322,22 +1356,33 @@ export function createApp(
     const v = z
       .object({
         active: z.boolean(),
-        password: z.string().min(12).max(128).optional(),
+        password: newPassword.optional(),
       })
       .parse(req.body);
     if (id === u.id && !v.active)
       fail(400, "You cannot deactivate your own account");
     const target: any = db
-      .prepare("SELECT id,role FROM users WHERE id=?")
+      .prepare(
+        "SELECT id,CASE WHEN is_admin=1 THEN 'admin' ELSE role END AS role FROM users WHERE id=?",
+      )
       .get(id);
-    if (!target) fail(404, "User not found");
+    if (!target || (target.role === "admin" && u.role !== "admin"))
+      fail(404, "User not found");
     if (!v.active && target.role === "owner") {
       const n: any = db
         .prepare(
-          "SELECT count(*) AS n FROM users WHERE role='owner' AND active=1 AND id<>?",
+          "SELECT count(*) AS n FROM users WHERE role='owner' AND is_admin=0 AND active=1 AND id<>?",
         )
         .get(id);
       if (!n.n) fail(400, "Keep at least one active owner");
+    }
+    if (!v.active && target.role === "admin") {
+      const n: any = db
+        .prepare(
+          "SELECT count(*) AS n FROM users WHERE is_admin=1 AND active=1 AND id<>?",
+        )
+        .get(id);
+      if (!n.n) fail(400, "Keep at least one active admin");
     }
     db.prepare("UPDATE users SET active=? WHERE id=?").run(+v.active, id);
     if (v.password)

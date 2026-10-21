@@ -46,6 +46,12 @@ export function openWorkersDatabase() {
       "utf8",
     ),
   );
+  db.exec(
+    readFileSync(
+      new URL("../../migrations/0007_admin_role.sql", import.meta.url),
+      "utf8",
+    ),
+  );
   seed(db);
   return db;
 }

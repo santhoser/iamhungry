@@ -11,7 +11,7 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173. On the first run the terminal prints a one-time setup URL; open it to create your owner account. No default staff password exists. Alternatively run `npm run staff:create -- owner yourusername` and enter a password. Create cashier accounts through Staff accounts after owner login.
+Open http://localhost:5173. When the first owner or admin is missing, the terminal prints separate one-time setup URLs. Use them privately to create each account with a password of 8–128 characters. No default staff password exists. Alternatively run `npm run staff:create -- admin|owner|cashier yourusername` and enter a password. Owners can create other owners and cashiers; admins can also create admins and reset owner passwords. Owner accounts cannot see or manage admin accounts.
 
 The initial menu is **sample content**, with original local SVG illustrations. Replace it with Cafe77's real menu/prices/photos. Fifteen table records are seeded with unique QR tokens. Owner → Table QR codes → Open table menu is the easiest way to try customer checkout. Scanning a valid table QR is required to submit an order; `/` allows browsing.
 
@@ -31,7 +31,8 @@ Menu-code search can be disabled. Online UPI is deliberately disabled until a ve
 
 ## Staff workflow
 
-- Owner: menu/groups/images/prices, settings, tables/QR printing, users, reporting and all cashier actions.
+- Admin: all owner controls, including owner creation and password resets, plus admin account management.
+- Owner: menu/groups/images/prices, settings, tables/QR printing, owner/cashier users, reporting and all cashier actions. Admin accounts are hidden.
 - Cashier: current/history orders, payment/refund recording, allowed status changes, item availability only.
 - Owner/cashier can cancel New, Accepted, InProgress and Ready. Paid cancellation preserves payment. Record a manual full refund only after it actually occurred. Reopening requires available menu items and keeps original order prices.
 - Ready → Closed requires full recorded payment and confirmation that the order is served. Closed is terminal.
@@ -74,7 +75,7 @@ The build command performs a deployment dry run only. Initial migration creates 
 node scripts/wrangler-local.mjs d1 execute DB --env staging --local --file cloudflare/seed-demo.sql
 ```
 
-Generate a random setup token with `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"`. Save it privately as `SETUP_TOKEN=...` in `.dev.vars.staging` (ignored by Git), using `.dev.vars.example` as the format reference. Run `npm run dev:workers`, then open `http://localhost:8788/admin?setup=<your-token>` and choose your own owner credentials. There are no default accounts. Owner setup is rejected once an owner exists. Remove the token file/value after successful setup. Set the QR base URL to the local origin through owner settings when testing table links locally.
+Generate a random setup token with `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"`. Save it privately as `SETUP_TOKEN=...` in `.dev.vars.staging` (ignored by Git), using `.dev.vars.example` as the format reference. Run `npm run dev:workers`, then open `http://localhost:8788/admin?setup=<your-token>` to create the first owner or `http://localhost:8788/admin?setup-admin=<your-token>` to create the first admin. Each setup path works only once for its role. Remove the token file/value after setup. Existing staging needs migration 0007 and a temporarily configured private setup token to create its first admin; this is a separate authorized deployment step. Set the QR base URL to the local origin through owner settings when testing table links locally.
 
 `npm run test:workers` builds the current Worker and runs SQL contract/concurrency tests plus actual workerd/D1 integration tests. `npm run test:ui:workers` builds and runs the browser flows against actual local workerd/D1 on port 5176. Tests create only isolated temporary databases and test accounts. On Windows, the local launcher copies the bundled workerd executable into ignored `data/tools/` because Windows can deny execution from the npm cache. Wrangler and Miniflare are pinned together.
 
