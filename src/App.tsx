@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import TaxLines from "./TaxLines";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
   ChevronRight,
@@ -15,12 +16,15 @@ import {
   UtensilsCrossed,
   ArrowLeft,
   RefreshCw,
+  MessageCircle,
 } from "lucide-react";
 import { api } from "./api";
 import {
   money,
   totals,
   statusLabel,
+  orderTypeLabel,
+  type OrderType,
   type MenuItem,
   type Group,
   type Restaurant,
@@ -88,6 +92,7 @@ function Menu() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [orderType, setOrderType] = useState<OrderType>("DineIn");
   const [requestKey, setRequestKey] = useState(() => crypto.randomUUID());
   useEffect(() => {
     let alive = true;
@@ -138,6 +143,14 @@ function Menu() {
       </div>
     );
   const { config, items, groups, table } = data;
+  const counterOnly = (item: MenuItem) =>
+    !!groups.find((group) => group.id === item.groupId)?.counterOnly;
+  const selectTag = (name: string) => {
+    setCategory(0);
+    setQuery(name);
+    setDetail(null);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
   const lines = Object.entries(cart)
     .filter(([, q]) => q > 0)
     .map(([id, quantity]) => ({
@@ -148,7 +161,8 @@ function Menu() {
   const count = lines.reduce((s, l) => s + l.quantity, 0);
   const amounts = totals(
     lines.map((l) => ({ price: l.item?.price || 0, quantity: l.quantity })),
-    config.gstRate,
+    config.cgstRate,
+    config.sgstRate,
     config.gstInclusive,
   );
   const filtered = items.filter(
@@ -156,6 +170,9 @@ function Menu() {
       (!category || i.groupId === category) &&
       (!query ||
         i.name.toLowerCase().includes(query.toLowerCase()) ||
+        i.tags.some((tag) =>
+          tag.name.toLowerCase().includes(query.toLowerCase()),
+        ) ||
         (config.menuCodeSearch &&
           i.code.toLowerCase().includes(query.toLowerCase()))),
   );
@@ -170,6 +187,7 @@ function Menu() {
         name,
         email,
         phone,
+        orderType,
         requestKey,
         items: lines.map((l) => ({ id: l.id, quantity: l.quantity })),
       });
@@ -204,9 +222,26 @@ function Menu() {
           {i.name}
         </button>
         <p>{i.details}</p>
+        {!!i.tags.length && (
+          <div className="item-tags">
+            {i.tags.map((tag) => (
+              <button
+                type="button"
+                className="item-tag"
+                key={tag.id}
+                onClick={() => selectTag(tag.name)}
+              >
+                {tag.image && <img src={tag.image} alt="" />}
+                {tag.name}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="product-bottom">
           <strong>{money(i.price)}</strong>
-          {i.ranOut ? (
+          {counterOnly(i) ? (
+            <span className="counter-visit">Please visit the counter</span>
+          ) : i.ranOut ? (
             <span className="muted">Sold out</span>
           ) : cart[i.id] ? (
             <div className="quantity">
@@ -240,13 +275,18 @@ function Menu() {
         <div className="wrap header-inner">
           <Brand config={config} />
           <div className="header-actions">
-            {table ? (
-              <span className="table-pill">
-                <MapPin size={15} /> Table {table.number}
-              </span>
-            ) : (
-              <span className="table-pill">Browse our menu</span>
-            )}
+            <div className="header-menu-links">
+              {table ? (
+                <span className="table-pill">
+                  <MapPin size={15} /> Table {table.number}
+                </span>
+              ) : (
+                <span className="table-pill">Browse our menu</span>
+              )}
+              <a className="staff-login-link" href="/admin">
+                Staff login <ArrowRight size={13} />
+              </a>
+            </div>
             <button
               className="bag-button"
               aria-label="Open cart"
@@ -367,8 +407,8 @@ function Menu() {
           </div>
           <p className="tax-note">
             {config.gstInclusive
-              ? `Prices include ${config.gstRate}% GST`
-              : `${config.gstRate}% GST is added at checkout`}
+              ? `Prices include CGST ${config.cgstRate}% + SGST ${config.sgstRate}%`
+              : `CGST ${config.cgstRate}% + SGST ${config.sgstRate}% added at checkout`}
           </p>
           {filtered.length ? (
             groups
@@ -403,9 +443,14 @@ function Menu() {
           <span>
             {config.name} · {config.tagline}
           </span>
-          <a href="/admin">
-            Staff login <ArrowRight size={13} />
-          </a>
+          <span className="footer-credit">
+            Developed by{" "}
+            <a href="https://optominds.com" target="_blank" rel="noreferrer">
+              Optominds Pty Ltd
+            </a>
+            , Australia.
+          </span>
+          <span>Menu illustrations are representative.</span>
         </footer>
       </main>
       {count > 0 && !cartOpen && (
@@ -449,6 +494,31 @@ function Menu() {
               </span>
               <h2>{detail.name}</h2>
               <p>{detail.details}</p>
+              {!!detail.tags.length && (
+                <div className="item-tags">
+                  {detail.tags.map((tag) => (
+                    <button
+                      type="button"
+                      className="item-tag"
+                      key={tag.id}
+                      onClick={() => selectTag(tag.name)}
+                    >
+                      {tag.image && <img src={tag.image} alt="" />}
+                      {tag.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {detail.calories && (
+                <p>
+                  <strong>Calories / nutrition:</strong> {detail.calories}
+                </p>
+              )}
+              {detail.ingredients && (
+                <p>
+                  <strong>Ingredients:</strong> {detail.ingredients}
+                </p>
+              )}
               {detail.images.slice(1).map((url) => (
                 <img
                   className="detail-extra"
@@ -464,17 +534,23 @@ function Menu() {
               )}
               <div className="product-bottom">
                 <strong>{money(detail.price)}</strong>
-                <button
-                  className="btn"
-                  disabled={detail.ranOut}
-                  onClick={() => {
-                    change(detail.id, 1);
-                    setDetail(null);
-                  }}
-                >
-                  {detail.ranOut ? "Out of stock" : "Add to order"}{" "}
-                  <Plus size={16} />
-                </button>
+                {counterOnly(detail) ? (
+                  <span className="counter-visit">
+                    Please visit the counter
+                  </span>
+                ) : (
+                  <button
+                    className="btn"
+                    disabled={detail.ranOut}
+                    onClick={() => {
+                      change(detail.id, 1);
+                      setDetail(null);
+                    }}
+                  >
+                    {detail.ranOut ? "Out of stock" : "Add to order"}{" "}
+                    <Plus size={16} />
+                  </button>
+                )}
               </div>
             </div>
           </section>
@@ -524,6 +600,9 @@ function Menu() {
                             ? money(l.item.price)
                             : "Please remove this item"}
                           {l.item?.ranOut ? " · Out of stock" : ""}
+                          {l.item && counterOnly(l.item)
+                            ? " · Please visit the counter"
+                            : ""}
                         </small>
                       </div>
                       <div className="quantity">
@@ -539,7 +618,11 @@ function Menu() {
                         <button
                           type="button"
                           disabled={
-                            busy || !l.item || l.item.ranOut || l.quantity >= 50
+                            busy ||
+                            !l.item ||
+                            l.item.ranOut ||
+                            counterOnly(l.item) ||
+                            l.quantity >= 50
                           }
                           onClick={() => change(l.id, 1)}
                           aria-label={"Add " + l.item?.name}
@@ -555,13 +638,7 @@ function Menu() {
                     <span>Taxable amount</span>
                     <span>{money(amounts.taxable)}</span>
                   </div>
-                  <div>
-                    <span>
-                      GST ({config.gstRate}%
-                      {config.gstInclusive ? ", included" : ""})
-                    </span>
-                    <span>{money(amounts.gst)}</span>
-                  </div>
+                  <TaxLines restaurant={config} amounts={amounts} />
                   <div className="bill-total">
                     <strong>Total</strong>
                     <strong>{money(amounts.total)}</strong>
@@ -582,8 +659,40 @@ function Menu() {
                       autoComplete="name"
                     />
                   </label>
+                  <label>
+                    Phone number
+                    <input
+                      type="tel"
+                      required
+                      inputMode="numeric"
+                      pattern="[0-9]{10}"
+                      minLength={10}
+                      maxLength={10}
+                      autoComplete="tel-national"
+                      placeholder="10 digit phone number"
+                      value={phone}
+                      onChange={(e) => {
+                        setPhone(e.target.value);
+                        setRequestKey(crypto.randomUUID());
+                      }}
+                    />
+                  </label>
+                  <label>
+                    Order type
+                    <select
+                      aria-label="Order type"
+                      value={orderType}
+                      onChange={(e) => {
+                        setOrderType(e.target.value as OrderType);
+                        setRequestKey(crypto.randomUUID());
+                      }}
+                    >
+                      <option value="DineIn">Dine-in</option>
+                      <option value="TakeAway">Take-away</option>
+                    </select>
+                  </label>
                   <details>
-                    <summary>Add contact details (optional)</summary>
+                    <summary>Add email (optional)</summary>
                     <p className="muted">
                       Order updates are available on the tracking page.
                     </p>
@@ -598,19 +707,6 @@ function Menu() {
                           setRequestKey(crypto.randomUUID());
                         }}
                         autoComplete="email"
-                      />
-                    </label>
-                    <label>
-                      Phone
-                      <input
-                        type="tel"
-                        maxLength={25}
-                        value={phone}
-                        onChange={(e) => {
-                          setPhone(e.target.value);
-                          setRequestKey(crypto.randomUUID());
-                        }}
-                        autoComplete="tel"
                       />
                     </label>
                   </details>
@@ -639,7 +735,9 @@ function Menu() {
                   disabled={
                     busy ||
                     !table ||
-                    lines.some((l) => !l.item || l.item.ranOut)
+                    lines.some(
+                      (l) => !l.item || l.item.ranOut || counterOnly(l.item),
+                    )
                   }
                   type="submit"
                 >
@@ -662,6 +760,10 @@ function Tracking({ token }: { token: string }) {
   const [order, setOrder] = useState<Order | null>(null);
   const [error, setError] = useState("");
   const [receipt, setReceipt] = useState(false);
+  const [messageText, setMessageText] = useState("");
+  const [sending, setSending] = useState(false);
+  const [reading, setReading] = useState(false);
+  const messageSectionRef = useRef<HTMLElement>(null);
   useEffect(() => {
     let alive = true;
     const load = () =>
@@ -692,12 +794,46 @@ function Tracking({ token }: { token: string }) {
   const steps = ["New", "Accepted", "InProgress", "Ready", "Closed"];
   const index = steps.indexOf(order.status);
   const paid = order.paid - order.refunded >= order.amounts.total;
+  const unreadMessages = order.messages.filter(
+    (message) => message.sender === "staff" && !message.readAt,
+  ).length;
   return (
     <>
       <header className="public-header">
         <div className="wrap header-inner">
           <Brand config={order.restaurant} />
           <span className="table-pill">Table {order.tableNumber}</span>
+          {unreadMessages > 0 && (
+            <button
+              className="customer-message-alert unread-message-icon"
+              aria-label={`${unreadMessages} unread messages`}
+              disabled={reading}
+              onClick={async () => {
+                messageSectionRef.current?.scrollIntoView({
+                  behavior: "smooth",
+                  block: "start",
+                });
+                setReading(true);
+                try {
+                  await api(
+                    `/orders/${encodeURIComponent(token)}/messages/read`,
+                    "POST",
+                    {},
+                  );
+                  setOrder(
+                    await api<Order>(`/orders/${encodeURIComponent(token)}`),
+                  );
+                } catch (e) {
+                  setError((e as Error).message);
+                } finally {
+                  setReading(false);
+                }
+              }}
+            >
+              <MessageCircle size={20} />
+              <span>{unreadMessages}</span>
+            </button>
+          )}
         </div>
       </header>
       <main className="tracking wrap">
@@ -705,6 +841,10 @@ function Tracking({ token }: { token: string }) {
           <ArrowLeft size={16} /> Browse menu
         </a>
         <section className="tracking-card">
+          <p className="muted">
+            {orderTypeLabel(order.orderType)} · Payment:{" "}
+            {order.paymentMode || "Pay at counter"}
+          </p>
           <div className="tracking-icon">
             {order.status === "Cancelled" ? (
               <X size={30} />
@@ -755,8 +895,8 @@ function Tracking({ token }: { token: string }) {
             </span>
           </div>
           <div className="tracking-items">
-            {order.items.map((i) => (
-              <div key={i.itemId}>
+            {order.items.map((i, lineIndex) => (
+              <div key={`${i.itemId}-${lineIndex}`}>
                 <span>
                   <b>{i.quantity} ×</b> {i.name}
                 </span>
@@ -769,15 +909,74 @@ function Tracking({ token }: { token: string }) {
               <span>Taxable amount</span>
               <span>{money(order.amounts.taxable)}</span>
             </div>
-            <div>
-              <span>GST ({order.restaurant.gstRate}%)</span>
-              <span>{money(order.amounts.gst)}</span>
-            </div>
+            <TaxLines restaurant={order.restaurant} amounts={order.amounts} />
             <div className="bill-total">
               <strong>Total</strong>
               <strong>{money(order.amounts.total)}</strong>
             </div>
           </div>
+          <section className="messages" ref={messageSectionRef}>
+            <h2>Messages</h2>
+            <div className="message-list">
+              {order.messages.length ? (
+                order.messages.map((message) => (
+                  <div
+                    className={`message message-${message.sender}`}
+                    key={message.id}
+                  >
+                    <strong>
+                      {message.sender === "staff" ? "Cafe77 team" : "You"}
+                    </strong>
+                    <p>{message.text}</p>
+                    <small>{indianTime(message.at)}</small>
+                  </div>
+                ))
+              ) : (
+                <p className="muted">
+                  Need anything? Send the counter a message.
+                </p>
+              )}
+            </div>
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setSending(true);
+                setError("");
+                try {
+                  await api(
+                    `/orders/${encodeURIComponent(token)}/messages`,
+                    "POST",
+                    { text: messageText },
+                  );
+                  setMessageText("");
+                  setOrder(
+                    await api<Order>(`/orders/${encodeURIComponent(token)}`),
+                  );
+                } catch (e) {
+                  setError((e as Error).message);
+                } finally {
+                  setSending(false);
+                }
+              }}
+            >
+              <label className="field">
+                Message to counter
+                <textarea
+                  required
+                  rows={2}
+                  maxLength={1000}
+                  value={messageText}
+                  onChange={(e) => setMessageText(e.target.value)}
+                />
+              </label>
+              <button
+                className="btn secondary"
+                disabled={sending || !messageText.trim()}
+              >
+                Send message
+              </button>
+            </form>
+          </section>
           {order.status === "Cancelled" && order.paid > order.refunded && (
             <p className="alert">
               Payment is recorded. Contact the counter about your refund.
@@ -831,9 +1030,13 @@ export function Receipt({
             {indianTime(order.createdAt)} · Table {order.tableNumber}
           </p>
           <p>Customer: {order.name}</p>
+          <p>
+            {orderTypeLabel(order.orderType)} · Payment:{" "}
+            {order.paymentMode || "Not recorded"}
+          </p>
           <div className="tracking-items">
-            {order.items.map((i) => (
-              <div key={i.itemId}>
+            {order.items.map((i, lineIndex) => (
+              <div key={`${i.itemId}-${lineIndex}`}>
                 <span>
                   {i.name}
                   <small>
@@ -849,13 +1052,7 @@ export function Receipt({
               <span>Taxable amount</span>
               <span>{money(order.amounts.taxable)}</span>
             </div>
-            <div>
-              <span>
-                GST {order.restaurant.gstRate}%{" "}
-                {order.restaurant.gstInclusive ? "(included)" : ""}
-              </span>
-              <span>{money(order.amounts.gst)}</span>
-            </div>
+            <TaxLines restaurant={order.restaurant} amounts={order.amounts} />
             <div className="bill-total">
               <strong>Total</strong>
               <strong>{money(order.amounts.total)}</strong>

@@ -8,9 +8,12 @@ import { createApp } from "./app.js";
 const db = openDatabase();
 const port = Number(process.env.PORT || 5173);
 const host = process.env.HOST || "127.0.0.1";
-const setupToken = db.prepare("SELECT id FROM users WHERE role='owner'").get()
-  ? undefined
-  : randomBytes(24).toString("hex");
+const needsOwner = !db
+  .prepare("SELECT id FROM users WHERE role='owner' AND is_admin=0")
+  .get();
+const needsAdmin = !db.prepare("SELECT id FROM users WHERE is_admin=1").get();
+const setupToken =
+  needsOwner || needsAdmin ? randomBytes(24).toString("hex") : undefined;
 const app = createApp(db, {
   setupToken,
   trustLocalProxy: process.env.CAFE77_TRUST_LOCAL_PROXY === "1",
@@ -29,9 +32,13 @@ if (process.argv.includes("--production")) {
 }
 server.listen(port, host, () => {
   console.log(`Cafe77 running at http://${host}:${port}`);
-  if (setupToken)
+  if (setupToken && needsOwner)
     console.log(
       `Create the first owner: http://localhost:${port}/admin?setup=${setupToken}`,
+    );
+  if (setupToken && needsAdmin)
+    console.log(
+      `Create the first admin: http://localhost:${port}/admin?setup-admin=${setupToken}`,
     );
 });
 function shutdown() {

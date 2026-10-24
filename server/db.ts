@@ -1,3 +1,4 @@
+import catalogue from "../shared/menu-catalogue.json";
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -8,6 +9,7 @@ import {
   createHash,
 } from "node:crypto";
 import type { Restaurant } from "../shared/domain.js";
+import { normalizeRestaurantConfig } from "../shared/domain.js";
 
 export function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
@@ -26,7 +28,9 @@ export const configPath = resolve(
   process.env.CAFE77_CONFIG || "config/restaurant.json",
 );
 export function readConfig(): Restaurant {
-  return JSON.parse(readFileSync(configPath, "utf8"));
+  return normalizeRestaurantConfig(
+    JSON.parse(readFileSync(configPath, "utf8")),
+  );
 }
 export function openDatabase(
   path = process.env.CAFE77_DB || "data/cafe77.sqlite",
@@ -45,14 +49,53 @@ export function openDatabase(
     CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY,order_id INTEGER NOT NULL REFERENCES orders(id),previous TEXT,status TEXT NOT NULL,reason TEXT NOT NULL DEFAULT '',actor TEXT NOT NULL,at TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS payments(id INTEGER PRIMARY KEY,order_id INTEGER NOT NULL REFERENCES orders(id),kind TEXT NOT NULL CHECK(kind IN ('payment','refund')),amount INTEGER NOT NULL CHECK(amount>0),actor TEXT NOT NULL,at TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY,actor TEXT NOT NULL,action TEXT NOT NULL,details TEXT NOT NULL,at TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS order_messages(id INTEGER PRIMARY KEY,order_id INTEGER NOT NULL REFERENCES orders(id),sender TEXT NOT NULL CHECK(sender IN ('customer','staff')),text TEXT NOT NULL,at TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS order_custom_items(id INTEGER PRIMARY KEY,order_id INTEGER NOT NULL REFERENCES orders(id),name TEXT NOT NULL,price INTEGER NOT NULL CHECK(price>=0),quantity INTEGER NOT NULL CHECK(quantity>0),actor TEXT NOT NULL,created_at TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS menu_history(id INTEGER PRIMARY KEY,menu_item_id INTEGER NOT NULL REFERENCES menu(id),item_code TEXT NOT NULL,item_name TEXT NOT NULL,changed_at TEXT NOT NULL,actor TEXT NOT NULL,change_type TEXT NOT NULL,system_comments TEXT NOT NULL,user_comments TEXT NOT NULL DEFAULT '',is_price_change INTEGER NOT NULL DEFAULT 0,old_price INTEGER,new_price INTEGER,old_ran_out INTEGER,new_ran_out INTEGER,old_today_special INTEGER,new_today_special INTEGER,old_dashboard_fav INTEGER,new_dashboard_fav INTEGER,old_active INTEGER,new_active INTEGER,before_json TEXT,after_json TEXT);
+    CREATE TABLE IF NOT EXISTS tags(id INTEGER PRIMARY KEY,name TEXT NOT NULL,image TEXT NOT NULL DEFAULT '');
+    CREATE UNIQUE INDEX IF NOT EXISTS tags_name_unique ON tags(lower(name));
+    CREATE TABLE IF NOT EXISTS menu_tags(menu_item_id INTEGER NOT NULL REFERENCES menu(id),tag_id INTEGER NOT NULL REFERENCES tags(id),PRIMARY KEY(menu_item_id,tag_id));
+    CREATE INDEX IF NOT EXISTS menu_tags_tag ON menu_tags(tag_id,menu_item_id);
+    CREATE INDEX IF NOT EXISTS menu_history_date ON menu_history(changed_at DESC,id DESC);
+    CREATE INDEX IF NOT EXISTS menu_history_item ON menu_history(menu_item_id,changed_at DESC);
+    CREATE INDEX IF NOT EXISTS order_custom_items_order ON order_custom_items(order_id,id);
+    CREATE INDEX IF NOT EXISTS messages_order ON order_messages(order_id,id);
     CREATE INDEX IF NOT EXISTS orders_created ON orders(created_at DESC);
     CREATE INDEX IF NOT EXISTS orders_status ON orders(status);
     CREATE INDEX IF NOT EXISTS events_order ON events(order_id);
     CREATE INDEX IF NOT EXISTS payments_order ON payments(order_id);
     CREATE INDEX IF NOT EXISTS items_order ON order_items(order_id);
   `);
+  if (
+    !db
+      .prepare("PRAGMA table_info(users)")
+      .all()
+      .some((column) => column.name === "is_admin")
+  )
+    db.exec("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0");
   // Upgrade existing local databases without removing historical rows.
   transaction(db, () => {
+    const orderColumns = db.prepare("PRAGMA table_info(orders)").all();
+    if (!orderColumns.some((column) => column.name === "order_type"))
+      db.exec(
+        "ALTER TABLE orders ADD COLUMN order_type TEXT NOT NULL DEFAULT 'DineIn' CHECK(order_type IN ('DineIn','TakeAway'))",
+      );
+    if (!orderColumns.some((column) => column.name === "payment_mode"))
+      db.exec(
+        "ALTER TABLE orders ADD COLUMN payment_mode TEXT CHECK(payment_mode IN ('Cash','UPI'))",
+      );
+    if (
+      !db
+        .prepare("PRAGMA table_info(payments)")
+        .all()
+        .some((column) => column.name === "mode")
+    )
+      db.exec(
+        "ALTER TABLE payments ADD COLUMN mode TEXT CHECK(mode IN ('Cash','UPI'))",
+      );
+    db.exec(
+      "CREATE INDEX IF NOT EXISTS orders_payment_mode_date ON orders(payment_mode,created_at DESC)",
+    );
     for (const table of ["tables", "groups", "menu"]) {
       const columns = db.prepare(`PRAGMA table_info(${table})`).all();
       if (!columns.some((column) => column.name === "deleted_at")) {
@@ -60,6 +103,31 @@ export function openDatabase(
       }
     }
     db.exec("CREATE INDEX IF NOT EXISTS menu_group ON menu(group_id)");
+    const menuColumns = db.prepare("PRAGMA table_info(menu)").all();
+    for (const [name, definition] of [
+      ["calories", "TEXT NOT NULL DEFAULT ''"],
+      ["show_calories", "INTEGER NOT NULL DEFAULT 0"],
+      ["ingredients", "TEXT NOT NULL DEFAULT ''"],
+      ["show_ingredients", "INTEGER NOT NULL DEFAULT 0"],
+    ])
+      if (!menuColumns.some((column) => column.name === name))
+        db.exec(`ALTER TABLE menu ADD COLUMN ${name} ${definition}`);
+    const groupColumns = db.prepare("PRAGMA table_info(groups)").all();
+    if (!groupColumns.some((column) => column.name === "counter_only"))
+      db.exec(
+        "ALTER TABLE groups ADD COLUMN counter_only INTEGER NOT NULL DEFAULT 0",
+      );
+    if (!groupColumns.some((column) => column.name === "customer_visible"))
+      db.exec(
+        "ALTER TABLE groups ADD COLUMN customer_visible INTEGER NOT NULL DEFAULT 0",
+      );
+    const messageColumns = db
+      .prepare("PRAGMA table_info(order_messages)")
+      .all();
+    if (!messageColumns.some((column) => column.name === "read_at")) {
+      db.exec("ALTER TABLE order_messages ADD COLUMN read_at TEXT");
+      db.exec("UPDATE order_messages SET read_at=at");
+    }
   });
   return db;
 }
@@ -84,158 +152,25 @@ export function seed(db: DatabaseSync) {
   }
   if (db.prepare("SELECT id FROM groups LIMIT 1").get()) return;
   transaction(db, () => {
-    [
-      "Coffee & tea",
-      "Small plates",
-      "Cafe favourites",
-      "Something sweet",
-      "Coolers",
-    ].forEach((name, i) =>
-      db.prepare("INSERT INTO groups(name,sort) VALUES(?,?)").run(name, i),
-    );
-    const items: [
-      number,
-      string,
-      string,
-      number,
-      string,
-      string,
-      number,
-      number,
-    ][] = [
-      [
-        1,
-        "C01",
-        "Filter coffee",
-        80,
-        "Freshly brewed, rich and comforting. A little pause in your day.",
-        "coffee",
-        1,
-        1,
-      ],
-      [
-        1,
-        "C02",
-        "Cappuccino",
-        140,
-        "A double espresso with silky steamed milk and a soft foam finish.",
-        "coffee",
-        0,
-        0,
-      ],
-      [
-        1,
-        "C03",
-        "Masala chai",
-        60,
-        "Our warming blend of tea, milk and fragrant Indian spices.",
-        "tea",
-        0,
-        1,
-      ],
-      [
-        2,
-        "S01",
-        "Chilli cheese toast",
-        150,
-        "Golden toast, melted cheese and a gentle chilli kick.",
-        "toast",
-        1,
-        0,
-      ],
-      [
-        2,
-        "S02",
-        "Classic French fries",
-        120,
-        "Crisp, golden fries, lightly salted and served with a dip.",
-        "fries",
-        0,
-        0,
-      ],
-      [
-        2,
-        "S03",
-        "Paneer bites",
-        180,
-        "Tender paneer, a crisp coating and a tangy house dip.",
-        "paneer",
-        0,
-        0,
-      ],
-      [
-        3,
-        "F01",
-        "Grilled paneer sandwich",
-        220,
-        "Grilled paneer, fresh vegetables and our house dressing.",
-        "sandwich",
-        1,
-        1,
-      ],
-      [
-        3,
-        "F02",
-        "Creamy white sauce pasta",
-        240,
-        "Pasta tossed in a creamy sauce with seasonal vegetables.",
-        "pasta",
-        0,
-        0,
-      ],
-      [
-        3,
-        "F03",
-        "Garden veggie burger",
-        190,
-        "A hearty vegetable patty, crunchy greens and a soft bun.",
-        "burger",
-        0,
-        0,
-      ],
-      [
-        4,
-        "D01",
-        "Chocolate brownie",
-        160,
-        "Rich chocolate, a fudgy centre and a beautifully crisp top.",
-        "brownie",
-        1,
-        1,
-      ],
-      [
-        4,
-        "D02",
-        "Cake of the day",
-        180,
-        "A little slice of happiness from the house of Cake Dew.",
-        "cake",
-        0,
-        0,
-      ],
-      [
-        5,
-        "B01",
-        "Fresh lime soda",
-        100,
-        "Fresh lime, bubbles and your choice of sweet or salted.",
-        "lime",
-        0,
-        0,
-      ],
-    ];
-    for (const [group, code, name, rupees, details, art, special, fav] of items)
+    for (const group of catalogue.groups)
+      db.prepare("INSERT INTO groups(id,name,image,sort) VALUES(?,?,?,?)").run(
+        group.id,
+        group.name,
+        group.image,
+        group.sort,
+      );
+    for (const item of catalogue.items)
       db.prepare(
-        "INSERT INTO menu(group_id,code,name,price,details,images,today_special,dashboard_fav) VALUES(?,?,?,?,?,?,?,?)",
+        "INSERT INTO menu(id,group_id,code,name,price,images,today_special,dashboard_fav) VALUES(?,?,?,?,?,?,?,?)",
       ).run(
-        group,
-        code,
-        name,
-        rupees * 100,
-        details,
-        JSON.stringify(["/illustrations/" + art + ".svg"]),
-        special,
-        fav,
+        item.id,
+        item.groupId,
+        item.code,
+        item.name,
+        item.price,
+        JSON.stringify(item.images),
+        Number(item.todaySpecial),
+        Number(item.dashboardFav),
       );
   });
 }
