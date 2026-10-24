@@ -1,3 +1,4 @@
+import catalogue from "../shared/menu-catalogue.json";
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -74,6 +75,27 @@ export function openDatabase(
     db.exec("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0");
   // Upgrade existing local databases without removing historical rows.
   transaction(db, () => {
+    const orderColumns = db.prepare("PRAGMA table_info(orders)").all();
+    if (!orderColumns.some((column) => column.name === "order_type"))
+      db.exec(
+        "ALTER TABLE orders ADD COLUMN order_type TEXT NOT NULL DEFAULT 'DineIn' CHECK(order_type IN ('DineIn','TakeAway'))",
+      );
+    if (!orderColumns.some((column) => column.name === "payment_mode"))
+      db.exec(
+        "ALTER TABLE orders ADD COLUMN payment_mode TEXT CHECK(payment_mode IN ('Cash','UPI'))",
+      );
+    if (
+      !db
+        .prepare("PRAGMA table_info(payments)")
+        .all()
+        .some((column) => column.name === "mode")
+    )
+      db.exec(
+        "ALTER TABLE payments ADD COLUMN mode TEXT CHECK(mode IN ('Cash','UPI'))",
+      );
+    db.exec(
+      "CREATE INDEX IF NOT EXISTS orders_payment_mode_date ON orders(payment_mode,created_at DESC)",
+    );
     for (const table of ["tables", "groups", "menu"]) {
       const columns = db.prepare(`PRAGMA table_info(${table})`).all();
       if (!columns.some((column) => column.name === "deleted_at")) {
@@ -130,158 +152,25 @@ export function seed(db: DatabaseSync) {
   }
   if (db.prepare("SELECT id FROM groups LIMIT 1").get()) return;
   transaction(db, () => {
-    [
-      "Coffee & tea",
-      "Small plates",
-      "Cafe favourites",
-      "Something sweet",
-      "Coolers",
-    ].forEach((name, i) =>
-      db.prepare("INSERT INTO groups(name,sort) VALUES(?,?)").run(name, i),
-    );
-    const items: [
-      number,
-      string,
-      string,
-      number,
-      string,
-      string,
-      number,
-      number,
-    ][] = [
-      [
-        1,
-        "C01",
-        "Filter coffee",
-        80,
-        "Freshly brewed, rich and comforting. A little pause in your day.",
-        "coffee",
-        1,
-        1,
-      ],
-      [
-        1,
-        "C02",
-        "Cappuccino",
-        140,
-        "A double espresso with silky steamed milk and a soft foam finish.",
-        "coffee",
-        0,
-        0,
-      ],
-      [
-        1,
-        "C03",
-        "Masala chai",
-        60,
-        "Our warming blend of tea, milk and fragrant Indian spices.",
-        "tea",
-        0,
-        1,
-      ],
-      [
-        2,
-        "S01",
-        "Chilli cheese toast",
-        150,
-        "Golden toast, melted cheese and a gentle chilli kick.",
-        "toast",
-        1,
-        0,
-      ],
-      [
-        2,
-        "S02",
-        "Classic French fries",
-        120,
-        "Crisp, golden fries, lightly salted and served with a dip.",
-        "fries",
-        0,
-        0,
-      ],
-      [
-        2,
-        "S03",
-        "Paneer bites",
-        180,
-        "Tender paneer, a crisp coating and a tangy house dip.",
-        "paneer",
-        0,
-        0,
-      ],
-      [
-        3,
-        "F01",
-        "Grilled paneer sandwich",
-        220,
-        "Grilled paneer, fresh vegetables and our house dressing.",
-        "sandwich",
-        1,
-        1,
-      ],
-      [
-        3,
-        "F02",
-        "Creamy white sauce pasta",
-        240,
-        "Pasta tossed in a creamy sauce with seasonal vegetables.",
-        "pasta",
-        0,
-        0,
-      ],
-      [
-        3,
-        "F03",
-        "Garden veggie burger",
-        190,
-        "A hearty vegetable patty, crunchy greens and a soft bun.",
-        "burger",
-        0,
-        0,
-      ],
-      [
-        4,
-        "D01",
-        "Chocolate brownie",
-        160,
-        "Rich chocolate, a fudgy centre and a beautifully crisp top.",
-        "brownie",
-        1,
-        1,
-      ],
-      [
-        4,
-        "D02",
-        "Cake of the day",
-        180,
-        "A little slice of happiness from the house of Cake Dew.",
-        "cake",
-        0,
-        0,
-      ],
-      [
-        5,
-        "B01",
-        "Fresh lime soda",
-        100,
-        "Fresh lime, bubbles and your choice of sweet or salted.",
-        "lime",
-        0,
-        0,
-      ],
-    ];
-    for (const [group, code, name, rupees, details, art, special, fav] of items)
+    for (const group of catalogue.groups)
+      db.prepare("INSERT INTO groups(id,name,image,sort) VALUES(?,?,?,?)").run(
+        group.id,
+        group.name,
+        group.image,
+        group.sort,
+      );
+    for (const item of catalogue.items)
       db.prepare(
-        "INSERT INTO menu(group_id,code,name,price,details,images,today_special,dashboard_fav) VALUES(?,?,?,?,?,?,?,?)",
+        "INSERT INTO menu(id,group_id,code,name,price,images,today_special,dashboard_fav) VALUES(?,?,?,?,?,?,?,?)",
       ).run(
-        group,
-        code,
-        name,
-        rupees * 100,
-        details,
-        JSON.stringify(["/illustrations/" + art + ".svg"]),
-        special,
-        fav,
+        item.id,
+        item.groupId,
+        item.code,
+        item.name,
+        item.price,
+        JSON.stringify(item.images),
+        Number(item.todaySpecial),
+        Number(item.dashboardFav),
       );
   });
 }

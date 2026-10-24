@@ -62,6 +62,7 @@ test("soft deletes preserve history, invalidate stale links, restrict cashiers a
     const input = {
       table: token,
       name: "History preservation",
+      phone: "9876543210",
       requestKey: randomUUID(),
       items: [{ id: item.id, quantity: 1 }],
     };
@@ -226,7 +227,7 @@ test("soft deletes preserve history, invalidate stale links, restrict cashiers a
     const paid = await req(
       "/admin/orders/" + order.id + "/payment",
       "POST",
-      { kind: "payment", version: order.version },
+      { kind: "payment", paymentMode: "Cash", version: order.version },
       cashier,
     );
     assert.equal(paid.status, 200);

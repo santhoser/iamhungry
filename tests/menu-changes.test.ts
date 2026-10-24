@@ -268,6 +268,7 @@ test("menu history, counter-only access, custom charges and appended payment", a
         await call("/orders", "POST", {
           table: token,
           name: "Guest",
+          phone: "9876543210",
           requestKey: randomUUID(),
           items: [{ id: fee.id, quantity: 1 }],
         })
@@ -279,6 +280,7 @@ test("menu history, counter-only access, custom charges and appended payment", a
         await call("/orders", "POST", {
           table: token,
           name: "Guest",
+          phone: "9876543210",
           requestKey: randomUUID(),
           items: [{ id: initial.data.items[1].id, quantity: 1 }],
           customItems: [{ name: "Forged", price: 1, quantity: 1 }],
@@ -306,6 +308,7 @@ test("menu history, counter-only access, custom charges and appended payment", a
       {
         table: 1,
         name: "Guest",
+        phone: "9876543210",
         requestKey: randomUUID(),
         items: [{ id: fee.id, quantity: 1 }],
         customItems: [{ name: "Parcel fee", price: 275, quantity: 2 }],
@@ -321,7 +324,7 @@ test("menu history, counter-only access, custom charges and appended payment", a
         await call(
           `/admin/orders/${order.id}/payment`,
           "POST",
-          { kind: "payment", version: order.version },
+          { kind: "payment", paymentMode: "Cash", version: order.version },
           cashier,
         )
       ).status,
@@ -359,7 +362,7 @@ test("menu history, counter-only access, custom charges and appended payment", a
         await call(
           `/admin/orders/${order.id}/payment`,
           "POST",
-          { kind: "payment", version: order.version },
+          { kind: "payment", paymentMode: "Cash", version: order.version },
           cashier,
         )
       ).status,

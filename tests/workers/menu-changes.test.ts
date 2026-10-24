@@ -241,6 +241,7 @@ test("D1 menu change history and counter charges survive guarded writes", async 
         await dispatch(db, "/api/orders", "POST", {
           table: tableToken,
           name: "Guest",
+          phone: "9876543210",
           requestKey: randomUUID(),
           items: [{ id: fee.id, quantity: 1 }],
         })
@@ -269,6 +270,7 @@ test("D1 menu change history and counter charges survive guarded writes", async 
       {
         table: 1,
         name: "Guest",
+        phone: "9876543210",
         requestKey: randomUUID(),
         items: [{ id: fee.id, quantity: 1 }],
         customItems: [{ name: "Parcel", price: 200, quantity: 1 }],
@@ -282,7 +284,7 @@ test("D1 menu change history and counter charges survive guarded writes", async 
       db,
       `/api/admin/orders/${order.id}/payment`,
       "POST",
-      { kind: "payment", version: order.version },
+      { kind: "payment", paymentMode: "Cash", version: order.version },
       cashier,
     );
     assert.equal(paid.status, 200);
@@ -307,7 +309,7 @@ test("D1 menu change history and counter charges survive guarded writes", async 
           db,
           `/api/admin/orders/${order.id}/payment`,
           "POST",
-          { kind: "payment", version: order.version },
+          { kind: "payment", paymentMode: "Cash", version: order.version },
           cashier,
         )
       ).status,

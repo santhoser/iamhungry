@@ -23,6 +23,8 @@ import {
   money,
   totals,
   statusLabel,
+  orderTypeLabel,
+  type OrderType,
   type MenuItem,
   type Group,
   type Restaurant,
@@ -90,6 +92,7 @@ function Menu() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [orderType, setOrderType] = useState<OrderType>("DineIn");
   const [requestKey, setRequestKey] = useState(() => crypto.randomUUID());
   useEffect(() => {
     let alive = true;
@@ -184,6 +187,7 @@ function Menu() {
         name,
         email,
         phone,
+        orderType,
         requestKey,
         items: lines.map((l) => ({ id: l.id, quantity: l.quantity })),
       });
@@ -271,13 +275,18 @@ function Menu() {
         <div className="wrap header-inner">
           <Brand config={config} />
           <div className="header-actions">
-            {table ? (
-              <span className="table-pill">
-                <MapPin size={15} /> Table {table.number}
-              </span>
-            ) : (
-              <span className="table-pill">Browse our menu</span>
-            )}
+            <div className="header-menu-links">
+              {table ? (
+                <span className="table-pill">
+                  <MapPin size={15} /> Table {table.number}
+                </span>
+              ) : (
+                <span className="table-pill">Browse our menu</span>
+              )}
+              <a className="staff-login-link" href="/admin">
+                Staff login <ArrowRight size={13} />
+              </a>
+            </div>
             <button
               className="bag-button"
               aria-label="Open cart"
@@ -434,9 +443,14 @@ function Menu() {
           <span>
             {config.name} · {config.tagline}
           </span>
-          <a href="/admin">
-            Staff login <ArrowRight size={13} />
-          </a>
+          <span className="footer-credit">
+            Developed by{" "}
+            <a href="https://optominds.com" target="_blank" rel="noreferrer">
+              Optominds Pty Ltd
+            </a>
+            , Australia.
+          </span>
+          <span>Menu illustrations are representative.</span>
         </footer>
       </main>
       {count > 0 && !cartOpen && (
@@ -645,8 +659,40 @@ function Menu() {
                       autoComplete="name"
                     />
                   </label>
+                  <label>
+                    Phone number
+                    <input
+                      type="tel"
+                      required
+                      inputMode="numeric"
+                      pattern="[0-9]{10}"
+                      minLength={10}
+                      maxLength={10}
+                      autoComplete="tel-national"
+                      placeholder="10 digit phone number"
+                      value={phone}
+                      onChange={(e) => {
+                        setPhone(e.target.value);
+                        setRequestKey(crypto.randomUUID());
+                      }}
+                    />
+                  </label>
+                  <label>
+                    Order type
+                    <select
+                      aria-label="Order type"
+                      value={orderType}
+                      onChange={(e) => {
+                        setOrderType(e.target.value as OrderType);
+                        setRequestKey(crypto.randomUUID());
+                      }}
+                    >
+                      <option value="DineIn">Dine-in</option>
+                      <option value="TakeAway">Take-away</option>
+                    </select>
+                  </label>
                   <details>
-                    <summary>Add contact details (optional)</summary>
+                    <summary>Add email (optional)</summary>
                     <p className="muted">
                       Order updates are available on the tracking page.
                     </p>
@@ -661,19 +707,6 @@ function Menu() {
                           setRequestKey(crypto.randomUUID());
                         }}
                         autoComplete="email"
-                      />
-                    </label>
-                    <label>
-                      Phone
-                      <input
-                        type="tel"
-                        maxLength={25}
-                        value={phone}
-                        onChange={(e) => {
-                          setPhone(e.target.value);
-                          setRequestKey(crypto.randomUUID());
-                        }}
-                        autoComplete="tel"
                       />
                     </label>
                   </details>
@@ -808,6 +841,10 @@ function Tracking({ token }: { token: string }) {
           <ArrowLeft size={16} /> Browse menu
         </a>
         <section className="tracking-card">
+          <p className="muted">
+            {orderTypeLabel(order.orderType)} · Payment:{" "}
+            {order.paymentMode || "Pay at counter"}
+          </p>
           <div className="tracking-icon">
             {order.status === "Cancelled" ? (
               <X size={30} />
@@ -993,6 +1030,10 @@ export function Receipt({
             {indianTime(order.createdAt)} · Table {order.tableNumber}
           </p>
           <p>Customer: {order.name}</p>
+          <p>
+            {orderTypeLabel(order.orderType)} · Payment:{" "}
+            {order.paymentMode || "Not recorded"}
+          </p>
           <div className="tracking-items">
             {order.items.map((i, lineIndex) => (
               <div key={`${i.itemId}-${lineIndex}`}>

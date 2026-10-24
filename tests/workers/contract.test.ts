@@ -54,6 +54,7 @@ test("complete counter order lifecycle, permissions, audit, refunds and privacy"
     });
     assert.equal(cashier.status, 200);
     assert.equal((await request("/admin/orders")).status, 401);
+    assert.equal((await request("/admin/order-alerts")).status, 401);
     assert.equal(
       (await request("/admin/config", "GET", undefined, cashier.cookie)).status,
       403,
@@ -100,7 +101,7 @@ test("complete counter order lifecycle, permissions, audit, refunds and privacy"
     const placed = await request("/orders", "POST", input);
     assert.equal(placed.status, 201);
     let order = placed.data.order;
-    assert.equal(order.amounts.total, 16000);
+    assert.equal(order.amounts.total, 20000);
     assert.equal(order.paid, 0);
     const retry = await request("/orders", "POST", input);
     assert.equal(retry.data.order.id, order.id);
@@ -112,6 +113,33 @@ test("complete counter order lifecycle, permissions, audit, refunds and privacy"
     );
     assert.equal((await request("/orders/" + order.number)).status, 404);
     assert.equal((await request("/orders/" + placed.data.token)).status, 200);
+    const alertSnapshot = async () =>
+      (await request("/admin/order-alerts", "GET", undefined, cashier.cookie))
+        .data;
+    assert.deepEqual(
+      (await alertSnapshot()).find((o: any) => o.id === order.id),
+      {
+        id: order.id,
+        messageId: 0,
+      },
+    );
+    await request("/orders/" + placed.data.token + "/messages", "POST", {
+      text: "Bell contract message",
+    });
+    const messageAlert = (await alertSnapshot()).find(
+      (o: any) => o.id === order.id,
+    );
+    assert.ok(messageAlert.messageId > 0);
+    await request(
+      "/admin/orders/" + order.id + "/messages/read",
+      "POST",
+      {},
+      cashier.cookie,
+    );
+    assert.deepEqual(
+      (await alertSnapshot()).find((o: any) => o.id === order.id),
+      messageAlert,
+    );
     const status = async (s: string, version = order.version) => {
       const r = await request(
         "/admin/orders/" + order.id + "/status",
@@ -131,7 +159,7 @@ test("complete counter order lifecycle, permissions, audit, refunds and privacy"
     const pay = await request(
       "/admin/orders/" + order.id + "/payment",
       "POST",
-      { kind: "payment", version: order.version },
+      { kind: "payment", paymentMode: "Cash", version: order.version },
       cashier.cookie,
     );
     assert.equal(pay.status, 200);
@@ -141,13 +169,17 @@ test("complete counter order lifecycle, permissions, audit, refunds and privacy"
         await request(
           "/admin/orders/" + order.id + "/payment",
           "POST",
-          { kind: "payment", version: order.version },
+          { kind: "payment", paymentMode: "Cash", version: order.version },
           cashier.cookie,
         )
       ).status,
       409,
     );
     assert.equal((await status("Closed")).status, 200);
+    assert.equal(
+      (await alertSnapshot()).some((o: any) => o.id === order.id),
+      false,
+    );
     assert.equal(order.events.length, 5);
     assert.equal(
       (
@@ -177,7 +209,7 @@ test("complete counter order lifecycle, permissions, audit, refunds and privacy"
       undefined,
       owner.cookie,
     );
-    assert.equal(dashboard.data.sales, 16000);
+    assert.equal(dashboard.data.sales, 20000);
     assert.equal(dashboard.data.items[0].quantity, 2);
     assert.equal((await status("Cancelled")).status, 409);
     const m = menu.data.items[0];
@@ -211,12 +243,12 @@ test("complete counter order lifecycle, permissions, audit, refunds and privacy"
     const payment = await request(
       "/admin/orders/" + order.id + "/payment",
       "POST",
-      { kind: "payment", version: order.version },
+      { kind: "payment", paymentMode: "Cash", version: order.version },
       owner.cookie,
     );
     order = payment.data;
     assert.equal((await status("Cancelled")).status, 200);
-    assert.equal(order.paid, 16000);
+    assert.equal(order.paid, 20000);
     assert.equal(order.refunded, 0);
     const refund = await request(
       "/admin/orders/" + order.id + "/payment",
@@ -226,7 +258,7 @@ test("complete counter order lifecycle, permissions, audit, refunds and privacy"
     );
     assert.equal(refund.status, 200);
     order = refund.data;
-    assert.equal(order.refunded, 16000);
+    assert.equal(order.refunded, 20000);
     await request(
       "/admin/menu/" + m.id + "/stock",
       "PUT",
@@ -248,8 +280,8 @@ test("complete counter order lifecycle, permissions, audit, refunds and privacy"
       200,
     );
     const original = await request("/orders/" + placed.data.token);
-    assert.equal(original.data.items[0].price, 8000);
-    assert.equal(original.data.amounts.total, 16000);
+    assert.equal(original.data.items[0].price, 10000);
+    assert.equal(original.data.amounts.total, 20000);
     assert.equal(
       (await request("/menu")).data.items.some((x: any) => x.id === m.id),
       false,

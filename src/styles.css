@@ -543,6 +543,27 @@ small {
   align-items: center;
   gap: 6px;
 }
+.header-menu-links {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.staff-login-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--red);
+  font-size: 11px;
+}
+.staff-login-link:hover {
+  text-decoration: underline;
+}
+.footer-credit a {
+  display: inline;
+  color: var(--red);
+  text-decoration: underline;
+}
 .cart-dock {
   position: fixed;
   bottom: 20px;
@@ -1308,6 +1329,33 @@ small {
 .order-row:hover {
   border-color: #c1a389;
 }
+.order-row[class*="order-status-"] {
+  border-inline-start: 8px solid var(--order-color);
+  background: var(--order-background);
+}
+.order-status-New {
+  --order-color: #bd7914;
+  --order-background: #fff5dc;
+}
+.order-status-Accepted {
+  --order-color: #25669a;
+  --order-background: #eaf3ff;
+}
+.order-status-InProgress {
+  --order-color: #8050a6;
+  --order-background: #f3eaff;
+}
+.order-status-Ready {
+  --order-color: #237647;
+  --order-background: #e5f6e9;
+}
+.order-row[class*="order-status-"] .order-table {
+  background: var(--order-color);
+  color: white;
+}
+.order-row[class*="order-status-"]:hover {
+  border-color: var(--order-color);
+}
 .order-table {
   background: #f5eada;
   color: var(--red);
@@ -1426,6 +1474,51 @@ small {
 .menu-toolbar > div {
   display: flex;
   gap: 9px;
+}
+.menu-filter-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr));
+  align-items: end;
+  gap: 14px;
+}
+.menu-filter-fields > * {
+  min-width: 0;
+}
+.menu-filter-fields .field {
+  margin-bottom: 0;
+}
+.menu-filter-search {
+  margin: 0;
+  max-width: none;
+}
+.menu-filter-search input {
+  min-width: 0;
+}
+.menu-filter-flags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  margin-top: 16px;
+}
+.menu-filter-flags label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.menu-filter-summary {
+  margin: 12px 0 0;
+  font-size: 11px;
+}
+@media (max-width: 650px) {
+  .menu-filter-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .menu-filter-search {
+    grid-column: 1 / -1;
+  }
 }
 .admin-menu-group .section-head {
   margin-bottom: 12px;
@@ -2508,6 +2601,11 @@ small {
   background: #fff1d9;
   border-color: #d9a342;
   box-shadow: inset 4px 0 #b5332c;
+}
+.order-row.has-unread-message[class*="order-status-"] {
+  background: var(--order-background);
+  border-inline-start-color: var(--order-color);
+  box-shadow: 0 0 0 2px #b5332c;
 }
 .unread-message-icon {
   color: #9b2723;

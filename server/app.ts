@@ -278,7 +278,7 @@ export function createApp(
     if (!row) return fail(404, "Order not found");
     const payments: any[] = db
       .prepare(
-        "SELECT kind,amount,actor,at FROM payments WHERE order_id=? ORDER BY id",
+        "SELECT kind,amount,actor,at,mode FROM payments WHERE order_id=? ORDER BY id",
       )
       .all(id);
     return {
@@ -289,6 +289,8 @@ export function createApp(
       name: row.name,
       email: row.email,
       phone: row.phone,
+      orderType: row.order_type,
+      paymentMode: row.payment_mode,
       status: row.status,
       createdAt: row.created_at,
       closedAt: row.closed_at,
@@ -403,11 +405,17 @@ export function createApp(
         email: z
           .union([z.string().email().max(150), z.literal("")])
           .default(""),
-        phone: z
-          .string()
-          .max(25)
-          .regex(/^[+\d\s()-]*$/)
-          .default(""),
+        phone: counter
+          ? z
+              .string()
+              .trim()
+              .regex(/^(\d{10})?$/, "Enter a 10 digit phone number")
+              .default("")
+          : z
+              .string()
+              .trim()
+              .regex(/^\d{10}$/, "Enter a 10 digit phone number"),
+        orderType: z.enum(["DineIn", "TakeAway"]).default("DineIn"),
         requestKey: z.string().uuid(),
         items: z
           .array(
@@ -482,7 +490,7 @@ export function createApp(
       const now = placedAt.toISOString();
       const row = db
         .prepare(
-          "INSERT INTO orders(number,token,request_key,request_hash,table_id,name,email,phone,created_at,amounts,restaurant) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+          "INSERT INTO orders(number,token,request_key,request_hash,table_id,name,email,phone,order_type,created_at,amounts,restaurant) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
         )
         .run(
           number,
@@ -493,6 +501,7 @@ export function createApp(
           input.name,
           input.email,
           input.phone,
+          input.orderType,
           now,
           JSON.stringify(amounts),
           JSON.stringify(cfg),
@@ -955,6 +964,16 @@ export function createApp(
     });
     res.json({ ok: true });
   });
+  app.get("/api/admin/order-alerts", (req, res) => {
+    staff(req);
+    res.json(
+      db
+        .prepare(
+          "SELECT o.id, COALESCE((SELECT MAX(m.id) FROM order_messages m WHERE m.order_id=o.id AND m.sender='customer'),0) AS messageId FROM orders o WHERE o.status NOT IN ('Closed','Cancelled')",
+        )
+        .all(),
+    );
+  });
   app.get("/api/admin/orders", (req, res) => {
     staff(req);
     const page = z.coerce
@@ -968,6 +987,9 @@ export function createApp(
       .string()
       .max(100)
       .parse(req.query.q || "");
+    const paymentMode = z
+      .enum(["", "Cash", "UPI", "Unknown"])
+      .parse(req.query.paymentMode || "");
     const statuses = z
       .string()
       .max(100)
@@ -996,14 +1018,30 @@ export function createApp(
       (statuses.length
         ? ` AND status IN (${statuses.map(() => "?").join(",")})`
         : "");
-    const params = [from, to, pattern, pattern, pattern, pattern, ...statuses];
+    const paymentWhere =
+      paymentMode === "Unknown"
+        ? " AND payment_mode IS NULL"
+        : paymentMode
+          ? " AND payment_mode=?"
+          : "";
+    const filteredWhere = where + paymentWhere;
+    const params = [
+      from,
+      to,
+      pattern,
+      pattern,
+      pattern,
+      pattern,
+      ...statuses,
+      ...(paymentMode && paymentMode !== "Unknown" ? [paymentMode] : []),
+    ];
     const count: any = db
-      .prepare("SELECT count(*) AS count FROM orders WHERE " + where)
+      .prepare("SELECT count(*) AS count FROM orders WHERE " + filteredWhere)
       .get(...params);
     const rows = db
       .prepare(
         "SELECT id FROM orders WHERE " +
-          where +
+          filteredWhere +
           " ORDER BY id DESC LIMIT ? OFFSET ?",
       )
       .all(...params, active ? 100 : 20, (page - 1) * (active ? 100 : 20));
@@ -1127,6 +1165,7 @@ export function createApp(
           "Closed",
           "Cancelled",
         ]),
+        paymentMode: z.enum(["Cash", "UPI"]).optional(),
         reason: z.string().max(500).default(""),
         version: z.number().int(),
       })
@@ -1138,8 +1177,8 @@ export function createApp(
           fail(409, "Order changed. Refresh and try again.");
         if (!transitions[o.status].includes(input.status))
           fail(409, "This status transition is not allowed");
-        if (input.status === "Closed" && o.paid - o.refunded < o.amounts.total)
-          fail(409, "Record full payment before closing");
+        if (input.status === "Closed" && !input.paymentMode && !o.paymentMode)
+          fail(409, "Choose a payment mode and confirm payment before closing");
         if (input.status === "New") {
           if (
             !db
@@ -1167,6 +1206,28 @@ export function createApp(
           }
         }
         const now = new Date().toISOString();
+        if (input.status === "Closed") {
+          const mode = input.paymentMode || o.paymentMode;
+          const outstanding = Math.max(
+            0,
+            o.amounts.total - o.paid + o.refunded,
+          );
+          if (outstanding > 0) {
+            db.prepare(
+              "INSERT INTO payments(order_id,kind,amount,actor,at,mode) VALUES(?,'payment',?,?,?,?)",
+            ).run(o.id, outstanding, u.username, now, mode);
+          }
+          db.prepare("UPDATE orders SET payment_mode=? WHERE id=?").run(
+            mode,
+            o.id,
+          );
+          audit(u.username, "order.close", {
+            id: o.id,
+            paymentMode: mode,
+            amount: outstanding,
+          });
+        }
+
         db.prepare(
           "UPDATE orders SET status=?,closed_at=?,version=version+1 WHERE id=?",
         ).run(input.status, input.status === "Closed" ? now : null, o.id);
@@ -1182,6 +1243,7 @@ export function createApp(
     const input = z
       .object({
         kind: z.enum(["payment", "refund"]),
+        paymentMode: z.enum(["Cash", "UPI"]).optional(),
         version: z.number().int(),
       })
       .parse(req.body);
@@ -1190,6 +1252,8 @@ export function createApp(
         const o = getOrder(idParam(req));
         if (o.version !== input.version)
           fail(409, "Order changed. Refresh and try again.");
+        if (input.kind === "payment" && !input.paymentMode)
+          fail(400, "Choose a payment mode");
         const net = o.paid - o.refunded;
         const amount = input.kind === "refund" ? net : o.amounts.total - net;
         if (amount <= 0) fail(409, "No outstanding amount");
@@ -1201,9 +1265,21 @@ export function createApp(
         )
           fail(409, "Payments cannot be recorded for this order status");
         db.prepare(
-          "INSERT INTO payments(order_id,kind,amount,actor,at) VALUES(?,?,?,?,?)",
-        ).run(o.id, input.kind, amount, u.username, new Date().toISOString());
+          "INSERT INTO payments(order_id,kind,amount,actor,at,mode) VALUES(?,?,?,?,?,?)",
+        ).run(
+          o.id,
+          input.kind,
+          amount,
+          u.username,
+          new Date().toISOString(),
+          input.kind === "payment" ? input.paymentMode! : o.paymentMode,
+        );
         db.prepare("UPDATE orders SET version=version+1 WHERE id=?").run(o.id);
+        if (input.kind === "payment")
+          db.prepare("UPDATE orders SET payment_mode=? WHERE id=?").run(
+            input.paymentMode!,
+            o.id,
+          );
         return getOrder(o.id);
       }),
     );

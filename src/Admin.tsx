@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import QRCode from "qrcode";
 import { api } from "./api";
+import { useOrderAlerts } from "./useOrderAlerts";
 import { exportHistory } from "./export-orders";
 import { exportMenuHistory } from "./export-menu-history";
 import { Brand, Receipt, indianTime } from "./App";
@@ -37,6 +38,9 @@ import {
   money,
   qrUrl,
   statusLabel,
+  orderTypeLabel,
+  type OrderType,
+  type PaymentMode,
   transitions,
   type Group,
   type MenuItem,
@@ -141,6 +145,9 @@ export default function Admin() {
   const [config, setConfig] = useState<Restaurant | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("orders");
+  const { soundEnabled, soundError, toggleSound } = useOrderAlerts(
+    !!user && tab === "orders",
+  );
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
@@ -154,6 +161,12 @@ export default function Admin() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [query, setQuery] = useState("");
+  const [historyPaymentMode, setHistoryPaymentMode] = useState("");
+  const [closing, setClosing] = useState(false);
+  const [closePaymentMode, setClosePaymentMode] = useState<PaymentMode | "">(
+    "",
+  );
+  const [counterOrderType, setCounterOrderType] = useState<OrderType>("DineIn");
   const [historyStatuses, setHistoryStatuses] = useState<string[]>([]);
   const [range, setRange] = useState(presetRange("today"));
   const [preset, setPreset] = useState("today");
@@ -216,6 +229,45 @@ export default function Admin() {
     groups: [],
     tags: [],
   });
+  const [menuSearch, setMenuSearch] = useState("");
+  const [menuStock, setMenuStock] = useState("all");
+  const [menuActivity, setMenuActivity] = useState("all");
+  const [menuSpecialOnly, setMenuSpecialOnly] = useState(false);
+  const [menuFavouriteOnly, setMenuFavouriteOnly] = useState(false);
+  const menuSearchTerms = menuSearch
+    .trim()
+    .toLocaleLowerCase()
+    .split(/\s+/)
+    .filter(Boolean);
+  const menuFiltering =
+    menuSearchTerms.length > 0 ||
+    menuStock !== "all" ||
+    menuActivity !== "all" ||
+    menuSpecialOnly ||
+    menuFavouriteOnly;
+  const filteredMenuItems = menu.items.filter((item) => {
+    const text =
+      `${item.name} ${item.code} ${item.tags.map((tag) => tag.name).join(" ")}`.toLocaleLowerCase();
+    return (
+      menuSearchTerms.every((term) => text.includes(term)) &&
+      (menuStock === "all" || item.ranOut === (menuStock === "out")) &&
+      (menuActivity === "all" || item.active === (menuActivity === "active")) &&
+      (!menuSpecialOnly || item.todaySpecial) &&
+      (!menuFavouriteOnly || item.dashboardFav)
+    );
+  });
+  const filteredMenuGroups = menu.groups.filter(
+    (group) =>
+      !menuFiltering ||
+      filteredMenuItems.some((item) => item.groupId === group.id),
+  );
+  const clearMenuFilters = () => {
+    setMenuSearch("");
+    setMenuStock("all");
+    setMenuActivity("all");
+    setMenuSpecialOnly(false);
+    setMenuFavouriteOnly(false);
+  };
   const [tagsOpen, setTagsOpen] = useState(false);
   const [editTag, setEditTag] = useState<Tag | null>(null);
   const [editItem, setEditItem] = useState<MenuItem | null>(null);
@@ -272,6 +324,9 @@ export default function Admin() {
       ...(tab === "history" && historyStatuses.length
         ? { statuses: historyStatuses.join(",") }
         : {}),
+      ...(tab === "history" && historyPaymentMode
+        ? { paymentMode: historyPaymentMode }
+        : {}),
       current: String(tab === "orders"),
     });
     if (tab === "orders" || tab === "history") {
@@ -322,6 +377,7 @@ export default function Admin() {
     range.from,
     range.to,
     historyFilters.join(","),
+    historyPaymentMode,
     historyStatuses.join(","),
   ]);
   useEffect(() => {
@@ -617,7 +673,6 @@ export default function Admin() {
               <ArrowRight size={17} />
             </button>
           </form>
-          <p className="muted">Admin, owner and cashier access · Cafe77</p>
         </section>
       </main>
     );
@@ -637,6 +692,40 @@ export default function Admin() {
       setReason("");
       await load();
     }, "Order updated");
+  const renderStatusAction = (s: Order["status"]) => (
+    <button
+      key={s}
+      className={
+        "btn " +
+        (s === "Cancelled" ? "danger" : s === "Closed" ? "" : "secondary")
+      }
+      disabled={busy}
+      onClick={() => {
+        if (s === "Closed") {
+          setClosePaymentMode(selected!.paymentMode || "");
+          setClosing(true);
+          return;
+        }
+
+        if (
+          (s === "Cancelled" || s === "New") &&
+          !window.confirm(
+            s === "New"
+              ? "Reopen this cancelled order? Review availability and payment first."
+              : "Cancel this order? Recorded payment is preserved.",
+          )
+        )
+          return;
+        orderAction("status", { status: s, reason });
+      }}
+    >
+      {s === "New"
+        ? "Reopen order"
+        : s === "Closed"
+          ? "Complete Order"
+          : statusLabel(s)}
+    </button>
+  );
   const upload = async (file: File) => {
     if (file.size > 2 * 1024 * 1024)
       throw new Error("Choose an image smaller than 2 MB");
@@ -889,20 +978,26 @@ export default function Admin() {
                       }}
                     />
                   </label>
+                  <Field label="Payment mode filter">
+                    <select
+                      aria-label="Payment mode filter"
+                      value={historyPaymentMode}
+                      onChange={(e) => {
+                        setHistoryPaymentMode(e.target.value);
+                        setPage(1);
+                      }}
+                    >
+                      <option value="">All payment modes</option>
+                      <option value="Cash">Cash</option>
+                      <option value="UPI">UPI</option>
+                      <option value="Unknown">Not recorded / unpaid</option>
+                    </select>
+                  </Field>
                   <div
                     className="order-status-filters"
                     aria-label="Order status filters"
                   >
-                    {(
-                      [
-                        "New",
-                        "Accepted",
-                        "InProgress",
-                        "Ready",
-                        "Closed",
-                        "Cancelled",
-                      ] as const
-                    ).map((status) => (
+                    {(["Closed", "Cancelled"] as const).map((status) => (
                       <label key={status}>
                         <input
                           type="checkbox"
@@ -924,7 +1019,13 @@ export default function Admin() {
                     className="btn secondary"
                     onClick={() =>
                       run(
-                        () => exportHistory(range, query, historyStatuses),
+                        () =>
+                          exportHistory(
+                            range,
+                            query,
+                            historyStatuses,
+                            historyPaymentMode,
+                          ),
                         "Excel export downloaded",
                       )
                     }
@@ -940,6 +1041,17 @@ export default function Admin() {
                 </span>
                 {tab === "orders" && (
                   <div className="list-actions">
+                    <button
+                      className="btn"
+                      aria-pressed={soundEnabled}
+                      onClick={() => void toggleSound()}
+                      title="Bell for new orders and customer messages. Enabling plays a test bell."
+                    >
+                      {soundEnabled
+                        ? "Mute sound alerts"
+                        : "Enable sound alerts"}
+                    </button>
+                    {soundError && <span role="status">{soundError}</span>}
                     <span className="live-note">
                       <span /> Updates every 5 seconds
                     </span>
@@ -978,6 +1090,7 @@ export default function Admin() {
                     <button
                       className={
                         "order-row" +
+                        (tab === "orders" ? " order-status-" + o.status : "") +
                         (o.messages.some(
                           (m) => m.sender === "customer" && !m.readAt,
                         )
@@ -997,6 +1110,8 @@ export default function Admin() {
                       <div className="order-person">
                         <strong>{o.name}</strong>
                         <small>
+                          {orderTypeLabel(o.orderType)} ·{" "}
+                          {o.paymentMode || "Unpaid / not recorded"} ·{" "}
                           {o.number} ·{" "}
                           {o.items.reduce((s, l) => s + l.quantity, 0)} items
                         </small>
@@ -1108,7 +1223,78 @@ export default function Admin() {
                   </div>
                 )}
               </div>
-              {menu.groups.map((g) => (
+              <section className="panel menu-filters" aria-label="Menu filters">
+                <div className="menu-filter-fields">
+                  <label className="search menu-filter-search">
+                    <Search size={16} aria-hidden="true" />
+                    <input
+                      type="search"
+                      aria-label="Search menu items"
+                      placeholder="Search by name, code or tag"
+                      value={menuSearch}
+                      onChange={(e) => setMenuSearch(e.target.value)}
+                    />
+                  </label>
+                  <Field label="Stock">
+                    <select
+                      aria-label="Stock filter"
+                      value={menuStock}
+                      onChange={(e) => setMenuStock(e.target.value)}
+                    >
+                      <option value="all">All stock</option>
+                      <option value="out">Out of stock</option>
+                      <option value="in">In stock</option>
+                    </select>
+                  </Field>
+                  <Field label="Item status">
+                    <select
+                      aria-label="Item status filter"
+                      value={menuActivity}
+                      onChange={(e) => setMenuActivity(e.target.value)}
+                    >
+                      <option value="all">All items</option>
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                    </select>
+                  </Field>
+                </div>
+                <div className="menu-filter-flags">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={menuSpecialOnly}
+                      onChange={(e) => setMenuSpecialOnly(e.target.checked)}
+                    />
+                    Today’s special
+                  </label>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={menuFavouriteOnly}
+                      onChange={(e) => setMenuFavouriteOnly(e.target.checked)}
+                    />
+                    Dashboard favourite
+                  </label>
+                  <button
+                    className="text-button"
+                    disabled={!menuFiltering}
+                    onClick={clearMenuFilters}
+                  >
+                    Clear filters
+                  </button>
+                </div>
+                <p className="muted menu-filter-summary" role="status">
+                  {filteredMenuItems.length} of {menu.items.length} items ·
+                  Items must match all selected filters.
+                </p>
+              </section>
+              {menuFiltering && filteredMenuItems.length === 0 && (
+                <Empty
+                  title="No menu items found"
+                  text="Try a different name, code, tag or filter, or clear the filters."
+                />
+              )}
+              {filteredMenuGroups.map((g) => (
                 <section className="panel admin-menu-group" key={g.id}>
                   <div className="section-head">
                     <h3>
@@ -1158,7 +1344,7 @@ export default function Admin() {
                       </div>
                     )}
                   </div>
-                  {menu.items
+                  {filteredMenuItems
                     .filter((i) => i.groupId === g.id)
                     .map((i) => (
                       <div className="admin-menu-row" key={i.id}>
@@ -1171,8 +1357,14 @@ export default function Admin() {
                           <small>
                             {i.code} · {money(i.price)}
                             {i.todaySpecial ? " · Today’s special" : ""}
+                            {i.dashboardFav ? " · Dashboard favourite" : ""}
                             {!i.active ? " · Inactive" : ""}
                           </small>
+                          {i.tags.length > 0 && (
+                            <small>
+                              {i.tags.map((tag) => tag.name).join(" · ")}
+                            </small>
+                          )}
                         </div>
                         <Toggle
                           label={i.ranOut ? "Out of stock" : "Available"}
@@ -1756,6 +1948,7 @@ export default function Admin() {
                     "POST",
                     {
                       ...counter,
+                      orderType: counterOrderType,
                       requestKey: counterRequestKey,
                       items,
                       customItems: counterCustom,
@@ -1763,6 +1956,7 @@ export default function Admin() {
                   );
                   setCounterOpen(false);
                   setCounter({ table: 1, name: "", email: "", phone: "" });
+                  setCounterOrderType("DineIn");
                   setCounterItems({});
                   setCounterCustom([]);
                   setCounterSearch("");
@@ -1795,10 +1989,24 @@ export default function Admin() {
                     }
                   />
                 </Field>
+                <Field label="Order type">
+                  <select
+                    aria-label="Order type"
+                    value={counterOrderType}
+                    onChange={(e) =>
+                      setCounterOrderType(e.target.value as OrderType)
+                    }
+                  >
+                    <option value="DineIn">Dine-in</option>
+                    <option value="TakeAway">Take-away</option>
+                  </select>
+                </Field>
                 <Field label="Phone (optional)">
                   <input
                     type="tel"
-                    maxLength={25}
+                    maxLength={10}
+                    pattern="[0-9]{10}"
+                    inputMode="numeric"
                     value={counter.phone}
                     onChange={(e) =>
                       setCounter({ ...counter, phone: e.target.value })
@@ -1993,14 +2201,29 @@ export default function Admin() {
             <div className="modal-body">
               <div className="order-facts">
                 <span>{indianTime(selected.createdAt)}</span>
+                <span>{orderTypeLabel(selected.orderType)}</span>
+                <span>Payment: {selected.paymentMode || "Not recorded"}</span>
                 <span className={"status status-" + selected.status}>
                   {statusLabel(selected.status)}
                 </span>
               </div>
               {(selected.email || selected.phone) && (
-                <p className="muted">
+                <p className="muted order-contact">
                   {selected.email} {selected.phone}
                 </p>
+              )}
+              {transitions[selected.status].some(
+                (s) => s !== "Cancelled" && s !== "New",
+              ) && (
+                <div
+                  className="status-actions order-primary-actions"
+                  role="group"
+                  aria-label="Order status actions"
+                >
+                  {transitions[selected.status]
+                    .filter((s) => s !== "Cancelled" && s !== "New")
+                    .map(renderStatusAction)}
+                </div>
               )}
               <div className="tracking-items">
                 {selected.items.map((i, lineIndex) => (
@@ -2131,24 +2354,6 @@ export default function Admin() {
                 </p>
               )}
               <div className="order-actions">
-                {selected.paid - selected.refunded < selected.amounts.total &&
-                  !["Closed", "Cancelled"].includes(selected.status) && (
-                    <button
-                      className="btn"
-                      disabled={busy}
-                      onClick={() =>
-                        setConfirmation({
-                          title: "Mark as Paid?",
-                          message: `Confirm that ${money(selected.amounts.total - selected.paid + selected.refunded)} has been received at the counter for ${selected.number}, Table ${selected.tableNumber}.`,
-                          confirmLabel: "Mark as Paid",
-                          onConfirm: () =>
-                            orderAction("payment", { kind: "payment" }),
-                        })
-                      }
-                    >
-                      <IndianRupee size={16} /> Mark as Paid
-                    </button>
-                  )}
                 {selected.status === "Cancelled" &&
                   selected.paid > selected.refunded && (
                     <button
@@ -2186,47 +2391,9 @@ export default function Admin() {
                     />
                   </Field>
                   <div className="status-actions">
-                    {transitions[selected.status].map((s) => (
-                      <button
-                        key={s}
-                        className={
-                          "btn " +
-                          (s === "Cancelled"
-                            ? "danger"
-                            : s === "Closed"
-                              ? ""
-                              : "secondary")
-                        }
-                        disabled={
-                          busy ||
-                          (s === "Closed" &&
-                            selected.paid - selected.refunded <
-                              selected.amounts.total)
-                        }
-                        onClick={() => {
-                          if (
-                            (s === "Cancelled" ||
-                              s === "Closed" ||
-                              s === "New") &&
-                            !window.confirm(
-                              s === "Closed"
-                                ? "Confirm this order is served and fully paid."
-                                : s === "New"
-                                  ? "Reopen this cancelled order? Review availability and payment first."
-                                  : "Cancel this order? Recorded payment is preserved.",
-                            )
-                          )
-                            return;
-                          orderAction("status", { status: s, reason });
-                        }}
-                      >
-                        {s === "New"
-                          ? "Reopen order"
-                          : s === "Closed"
-                            ? "Served & paid — close"
-                            : statusLabel(s)}
-                      </button>
-                    ))}
+                    {transitions[selected.status]
+                      .filter((s) => s === "Cancelled" || s === "New")
+                      .map(renderStatusAction)}
                   </div>
                 </>
               )}
@@ -2997,6 +3164,41 @@ export default function Admin() {
         </div>
       )}
       {receipt && <Receipt order={receipt} onClose={() => setReceipt(null)} />}
+      {closing && selected && (
+        <ConfirmDialog
+          busy={busy}
+          confirmDisabled={!closePaymentMode}
+          onClose={() => setClosing(false)}
+          confirmation={{
+            title: "Complete Order",
+            message: `Confirm ${money(Math.max(0, selected.amounts.total - selected.paid + selected.refunded))} received for ${selected.number}, Table ${selected.tableNumber}, and that the order has been served.`,
+            confirmLabel: "Confirm payment & close",
+            onConfirm: () =>
+              orderAction("status", {
+                status: "Closed",
+                reason,
+                paymentMode: closePaymentMode,
+              }),
+          }}
+        >
+          <Field label="Payment mode">
+            <select
+              aria-label="Payment mode"
+              autoFocus
+              value={closePaymentMode}
+              disabled={busy}
+              onChange={(e) =>
+                setClosePaymentMode(e.target.value as PaymentMode)
+              }
+            >
+              <option value="">Choose payment mode</option>
+              <option value="Cash">Cash</option>
+              <option value="UPI">UPI</option>
+            </select>
+          </Field>
+          <p className="muted">Record payment received at the counter.</p>
+        </ConfirmDialog>
+      )}
       {confirmation && (
         <ConfirmDialog
           confirmation={confirmation}

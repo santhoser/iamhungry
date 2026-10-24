@@ -26,52 +26,13 @@ test("actual workerd/D1 runtime: setup, auth, atomic order/payment, uploads and 
   );
   try {
     const db = await mf.getD1Database("DB");
-    await db.exec(readFileSync("migrations/0001_initial.sql", "utf8"));
     await db.exec(
-      readFileSync("migrations/0003_order_messages_menu_details.sql", "utf8"),
-    );
-    await db.exec(
-      readFileSync("migrations/0004_message_read_state.sql", "utf8"),
-    );
-    await db.exec(
-      readFileSync("migrations/0005_menu_history_counter_orders.sql", "utf8"),
-    );
-    await db.exec(
-      readFileSync("migrations/0006_tags_counter_visibility.sql", "utf8"),
-    );
-    await db.exec(
-      "INSERT INTO users(username,password,role) VALUES('legacyowner','hash','owner'); INSERT INTO sessions(token,user_id,expires) VALUES('legacy-session',1,9999999999999);",
-    );
-    await db.exec(readFileSync("migrations/0007_admin_role.sql", "utf8"));
-    assert.equal(
-      (
-        (await db
-          .prepare("SELECT username FROM users WHERE id=1")
-          .first()) as any
-      ).username,
-      "legacyowner",
-    );
-    assert.equal(
-      (
-        (await db
-          .prepare("SELECT user_id FROM sessions WHERE token='legacy-session'")
-          .first()) as any
-      ).user_id,
-      1,
-    );
-    assert.equal(
-      (await db.prepare("PRAGMA foreign_key_check").all()).results.length,
-      0,
-    );
-    await db.exec(
-      "DELETE FROM sessions WHERE token='legacy-session'; DELETE FROM users WHERE username='legacyowner';",
-    );
-    await db.exec(
-      readFileSync("cloudflare/seed-demo.sql", "utf8")
+      readFileSync("migrations/0001_cafe77.sql", "utf8")
         .split("\n")
         .filter((line) => !line.startsWith("--"))
         .join("\n"),
     );
+    await db.exec(readFileSync("migrations/0002_order_checkout.sql", "utf8"));
     const request = async (
       path: string,
       method = "GET",
@@ -127,20 +88,21 @@ test("actual workerd/D1 runtime: setup, auth, atomic order/payment, uploads and 
     );
     assert.equal(tables.data.length, 15);
     const menu = await request("/menu?table=" + tables.data[0].token);
-    assert.equal(menu.data.items.length, 12);
+    assert.equal(menu.data.items.length, 228);
     const input = {
       table: tables.data[0].token,
       name: "Runtime customer",
+      phone: "9876543210",
       requestKey: randomUUID(),
       items: [{ id: 1, quantity: 2 }],
     };
     const placed = await request("/orders", "POST", input);
     assert.equal(placed.status, 201, JSON.stringify(placed.data));
-    assert.equal(placed.data.order.amounts.total, 16000);
+    assert.equal(placed.data.order.amounts.total, 20000);
     assert.equal(placed.data.order.restaurant.cgstRate, 2.5);
     assert.equal(placed.data.order.restaurant.sgstRate, 2.5);
-    assert.equal(placed.data.order.amounts.cgst, 381);
-    assert.equal(placed.data.order.amounts.sgst, 381);
+    assert.equal(placed.data.order.amounts.cgst, 476);
+    assert.equal(placed.data.order.amounts.sgst, 476);
     const counterOrder = await request(
       "/admin/orders",
       "POST",
@@ -204,12 +166,6 @@ test("actual workerd/D1 runtime: setup, auth, atomic order/payment, uploads and 
     const readMessages = await request(`/orders/${counterOrder.data.token}`);
     assert.ok(readMessages.data.messages[0].readAt);
     assert.ok(readMessages.data.messages[1].readAt);
-    await db.exec(
-      readFileSync("migrations/0002_split_gst.sql", "utf8")
-        .split("\n")
-        .filter((line) => !line.startsWith("--"))
-        .join(" "),
-    );
     const persistedTax = JSON.parse(
       (
         (await db
@@ -231,13 +187,13 @@ test("actual workerd/D1 runtime: setup, auth, atomic order/payment, uploads and 
       request(
         `/admin/orders/${placed.data.order.id}/payment`,
         "POST",
-        { kind: "payment", version: 1 },
+        { kind: "payment", paymentMode: "Cash", version: 1 },
         login.cookie,
       ),
       request(
         `/admin/orders/${placed.data.order.id}/payment`,
         "POST",
-        { kind: "payment", version: 1 },
+        { kind: "payment", paymentMode: "Cash", version: 1 },
         login.cookie,
       ),
     ]);
@@ -251,7 +207,7 @@ test("actual workerd/D1 runtime: setup, auth, atomic order/payment, uploads and 
     assert.equal(current.status, 200);
     assert.equal(
       current.data.orders.find((o: any) => o.id === placed.data.order.id).paid,
-      16000,
+      20000,
     );
     const config = await request(
       "/admin/config",
@@ -285,13 +241,13 @@ test("actual workerd/D1 runtime: setup, auth, atomic order/payment, uploads and 
       requestKey: randomUUID(),
     });
     assert.equal(exclusive.status, 201);
-    assert.equal(exclusive.data.order.amounts.cgst, 408);
-    assert.equal(exclusive.data.order.amounts.sgst, 520);
-    assert.equal(exclusive.data.order.amounts.total, 16928);
+    assert.equal(exclusive.data.order.amounts.cgst, 510);
+    assert.equal(exclusive.data.order.amounts.sgst, 650);
+    assert.equal(exclusive.data.order.amounts.total, 21160);
     const originalTax = (await request("/orders/" + placed.data.token)).data;
     assert.equal(originalTax.restaurant.cgstRate, 2.5);
     assert.equal(originalTax.restaurant.sgstRate, 2.5);
-    assert.equal(originalTax.amounts.total, 16000);
+    assert.equal(originalTax.amounts.total, 20000);
     const image = Buffer.alloc(2 * 1024 * 1024);
     Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]).copy(image);
     const upload = await request(
@@ -310,10 +266,44 @@ test("actual workerd/D1 runtime: setup, auth, atomic order/payment, uploads and 
       (await request("/admin/events", "GET", undefined, login.cookie)).status,
       204,
     );
+    let toClose = exclusive.data.order;
+    for (const status of ["InProgress", "Ready"]) {
+      const updated = await request(
+        `/admin/orders/${toClose.id}/status`,
+        "POST",
+        { status, version: toClose.version },
+        login.cookie,
+      );
+      assert.equal(updated.status, 200);
+      toClose = updated.data;
+    }
+    const closures = await Promise.all(
+      [1, 2].map(() =>
+        request(
+          `/admin/orders/${toClose.id}/status`,
+          "POST",
+          { status: "Closed", paymentMode: "UPI", version: toClose.version },
+          login.cookie,
+        ),
+      ),
+    );
+    assert.deepEqual(closures.map((r) => r.status).sort(), [200, 409]);
+    const closed = closures.find((r) => r.status === 200)!.data;
+    assert.equal(closed.paymentMode, "UPI");
+    assert.equal(closed.payments[0].mode, "UPI");
+    assert.equal(closed.paid, closed.amounts.total);
+    const filtered = await request(
+      "/admin/orders?paymentMode=UPI&statuses=Closed",
+      "GET",
+      undefined,
+      login.cookie,
+    );
+    assert.equal(filtered.data.total, 1);
+    assert.equal(filtered.data.orders[0].id, closed.id);
     assert.equal(
       ((await db.prepare("SELECT count(*) AS n FROM payments").first()) as any)
         .n,
-      1,
+      2,
     );
   } finally {
     await mf.dispose();

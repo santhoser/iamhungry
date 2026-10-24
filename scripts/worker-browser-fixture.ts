@@ -24,24 +24,13 @@ const mf = new Miniflare(
   }),
 );
 const db = await mf.getD1Database("DB");
-await db.exec(readFileSync("migrations/0001_initial.sql", "utf8"));
 await db.exec(
-  readFileSync("migrations/0003_order_messages_menu_details.sql", "utf8"),
-);
-await db.exec(readFileSync("migrations/0004_message_read_state.sql", "utf8"));
-await db.exec(
-  readFileSync("migrations/0005_menu_history_counter_orders.sql", "utf8"),
-);
-await db.exec(
-  readFileSync("migrations/0006_tags_counter_visibility.sql", "utf8"),
-);
-await db.exec(readFileSync("migrations/0007_admin_role.sql", "utf8"));
-await db.exec(
-  readFileSync("cloudflare/seed-demo.sql", "utf8")
+  readFileSync("migrations/0001_cafe77.sql", "utf8")
     .split("\n")
     .filter((line) => !line.startsWith("--"))
     .join("\n"),
 );
+await db.exec(readFileSync("migrations/0002_order_checkout.sql", "utf8"));
 const setup = await mf.dispatchFetch("http://127.0.0.1:5176/api/setup", {
   method: "POST",
   headers: { "Content-Type": "application/json" },

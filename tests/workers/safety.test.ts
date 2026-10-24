@@ -35,6 +35,7 @@ async function fixture() {
     input: {
       table: table.token,
       name: "Worker test",
+      phone: "9876543210",
       requestKey: randomUUID(),
       items: [{ id: 1, quantity: 1 }],
     },
@@ -55,14 +56,14 @@ test("concurrent checkout is idempotent and simultaneous payments record exactly
         db,
         `/api/admin/orders/${order.id}/payment`,
         "POST",
-        { kind: "payment", version: 1 },
+        { kind: "payment", paymentMode: "Cash", version: 1 },
         owner,
       ),
       dispatch(
         db,
         `/api/admin/orders/${order.id}/payment`,
         "POST",
-        { kind: "payment", version: 1 },
+        { kind: "payment", paymentMode: "Cash", version: 1 },
         owner,
       ),
     ]);
@@ -117,7 +118,11 @@ test("session revocation during a write prevents payment and retries to unauthor
       {
         method: "POST",
         headers: { "Content-Type": "application/json", Cookie: owner },
-        body: JSON.stringify({ kind: "payment", version: 1 }),
+        body: JSON.stringify({
+          kind: "payment",
+          paymentMode: "Cash",
+          version: 1,
+        }),
       },
     );
     assert.equal((await worker.fetch(request, { DB: binding })).status, 401);
@@ -245,10 +250,6 @@ test("settings survive new Worker instances; table revival invalidates old QR; l
 test("100-line checkout and 100 current orders stay inside the 50-query free limit", async () => {
   const { db, owner, input } = await fixture();
   try {
-    for (let id = 13; id <= 100; id++)
-      db.prepare(
-        "INSERT INTO menu(id,group_id,code,name,price) VALUES(?,1,?,?,100)",
-      ).run(id, "X" + id, "Item " + id);
     const result = await dispatch(db, "/api/orders", "POST", {
       ...input,
       items: Array.from({ length: 100 }, (_, i) => ({

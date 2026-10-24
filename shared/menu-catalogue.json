@@ -1,0 +1,2439 @@
+{
+  "source": "Item_Details_Report.xlsx",
+  "sheet": "Item Details Report",
+  "priceUnit": "integer paise (Sell Price in INR × 100)",
+  "groups": [
+    {
+      "id": 1,
+      "name": "Hot Beverages",
+      "sort": 1,
+      "image": "/illustrations/menu/group01.svg"
+    },
+    {
+      "id": 2,
+      "name": "Fruit & Veg Combos Juices",
+      "sort": 2,
+      "image": "/illustrations/menu/group02.svg"
+    },
+    {
+      "id": 3,
+      "name": "Snacks",
+      "sort": 3,
+      "image": "/illustrations/menu/group03.svg"
+    },
+    {
+      "id": 4,
+      "name": "Falooda",
+      "sort": 4,
+      "image": "/illustrations/menu/group04.svg"
+    },
+    {
+      "id": 5,
+      "name": "Mocktails",
+      "sort": 5,
+      "image": "/illustrations/menu/group05.svg"
+    },
+    {
+      "id": 6,
+      "name": "Cold Coffee",
+      "sort": 6,
+      "image": "/illustrations/menu/group06.svg"
+    },
+    {
+      "id": 7,
+      "name": "Cold Pressed Fresh Juices",
+      "sort": 7,
+      "image": "/illustrations/menu/group07.svg"
+    },
+    {
+      "id": 8,
+      "name": "Smoothie Bowls",
+      "sort": 8,
+      "image": "/illustrations/menu/group08.svg"
+    },
+    {
+      "id": 9,
+      "name": "Shakes",
+      "sort": 9,
+      "image": "/illustrations/menu/group09.svg"
+    },
+    {
+      "id": 10,
+      "name": "Iced Tea",
+      "sort": 10,
+      "image": "/illustrations/menu/group10.svg"
+    },
+    {
+      "id": 11,
+      "name": "Ice Cream Sundae",
+      "sort": 11,
+      "image": "/illustrations/menu/group11.svg"
+    },
+    {
+      "id": 12,
+      "name": "Lemonades",
+      "sort": 12,
+      "image": "/illustrations/menu/group12.svg"
+    },
+    {
+      "id": 13,
+      "name": "Special Shakes",
+      "sort": 13,
+      "image": "/illustrations/menu/group13.svg"
+    },
+    {
+      "id": 14,
+      "name": "Sarbaths",
+      "sort": 14,
+      "image": "/illustrations/menu/group14.svg"
+    },
+    {
+      "id": 15,
+      "name": "Parfaits",
+      "sort": 15,
+      "image": "/illustrations/menu/group15.svg"
+    },
+    {
+      "id": 16,
+      "name": "Our Specials",
+      "sort": 16,
+      "image": "/illustrations/menu/group16.svg"
+    },
+    {
+      "id": 17,
+      "name": "Party Cakes",
+      "sort": 17,
+      "image": "/illustrations/menu/group17.svg"
+    },
+    {
+      "id": 18,
+      "name": "Retails",
+      "sort": 18,
+      "image": "/illustrations/menu/group18.svg"
+    },
+    {
+      "id": 19,
+      "name": "Tea Cakes",
+      "sort": 19,
+      "image": "/illustrations/menu/group19.svg"
+    },
+    {
+      "id": 20,
+      "name": "Burger",
+      "sort": 20,
+      "image": "/illustrations/menu/group20.svg"
+    },
+    {
+      "id": 21,
+      "name": "French Fries",
+      "sort": 21,
+      "image": "/illustrations/menu/group21.svg"
+    },
+    {
+      "id": 22,
+      "name": "Pastries",
+      "sort": 22,
+      "image": "/illustrations/menu/group22.svg"
+    },
+    {
+      "id": 23,
+      "name": "Sandwiches",
+      "sort": 23,
+      "image": "/illustrations/menu/group23.svg"
+    },
+    {
+      "id": 24,
+      "name": "Sugar Free Shakes",
+      "sort": 24,
+      "image": "/illustrations/menu/group24.svg"
+    },
+    {
+      "id": 25,
+      "name": "North Indian",
+      "sort": 25,
+      "image": "/illustrations/menu/group25.svg"
+    }
+  ],
+  "items": [
+    {
+      "id": 1,
+      "groupId": 6,
+      "code": "I001",
+      "name": "Affogatto",
+      "price": 10000,
+      "images": ["/illustrations/menu/i001.svg"],
+      "todaySpecial": true,
+      "dashboardFav": true
+    },
+    {
+      "id": 2,
+      "groupId": 24,
+      "code": "I002",
+      "name": "Almond Fig & Honey",
+      "price": 16000,
+      "images": ["/illustrations/menu/i002.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 3,
+      "groupId": 3,
+      "code": "I003",
+      "name": "Muffin Almond",
+      "price": 4500,
+      "images": ["/illustrations/menu/i003.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 4,
+      "groupId": 9,
+      "code": "I004",
+      "name": "Alphonso Mango",
+      "price": 9500,
+      "images": ["/illustrations/menu/i004.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 5,
+      "groupId": 1,
+      "code": "I005",
+      "name": "Americano",
+      "price": 6000,
+      "images": ["/illustrations/menu/i005.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 6,
+      "groupId": 16,
+      "code": "I006",
+      "name": "Aval Milk",
+      "price": 7000,
+      "images": ["/illustrations/menu/i006.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 7,
+      "groupId": 19,
+      "code": "I007",
+      "name": "Banana Loaf",
+      "price": 5000,
+      "images": ["/illustrations/menu/i007.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 8,
+      "groupId": 16,
+      "code": "I008",
+      "name": "Banana Loaf Loaded",
+      "price": 9000,
+      "images": ["/illustrations/menu/i008.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 9,
+      "groupId": 24,
+      "code": "I009",
+      "name": "Banana Peanut Butter",
+      "price": 14000,
+      "images": ["/illustrations/menu/i009.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 10,
+      "groupId": 11,
+      "code": "I010",
+      "name": "Banana Split",
+      "price": 14000,
+      "images": ["/illustrations/menu/i010.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 11,
+      "groupId": 17,
+      "code": "I011",
+      "name": "Banoffee Pie",
+      "price": 110000,
+      "images": ["/illustrations/menu/i011.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 12,
+      "groupId": 2,
+      "code": "I012",
+      "name": "Beetroot Orange",
+      "price": 10000,
+      "images": ["/illustrations/menu/i012.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 13,
+      "groupId": 2,
+      "code": "I013",
+      "name": "Beetroot Watermelon",
+      "price": 7000,
+      "images": ["/illustrations/menu/i013.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 14,
+      "groupId": 16,
+      "code": "I014",
+      "name": "Berry Up",
+      "price": 10000,
+      "images": ["/illustrations/menu/i014.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 15,
+      "groupId": 10,
+      "code": "I015",
+      "name": "Black Currant",
+      "price": 5000,
+      "images": ["/illustrations/menu/i015.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 16,
+      "groupId": 17,
+      "code": "I016",
+      "name": "Black Current",
+      "price": 80000,
+      "images": ["/illustrations/menu/i016.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 17,
+      "groupId": 17,
+      "code": "I017",
+      "name": "Black Forest",
+      "price": 65000,
+      "images": ["/illustrations/menu/i017.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 18,
+      "groupId": 9,
+      "code": "I018",
+      "name": "BlackCurrant",
+      "price": 10000,
+      "images": ["/illustrations/menu/i018.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 19,
+      "groupId": 14,
+      "code": "I019",
+      "name": "Blackcurrant",
+      "price": 5000,
+      "images": ["/illustrations/menu/i019.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 20,
+      "groupId": 10,
+      "code": "I020",
+      "name": "Blue Berry",
+      "price": 5000,
+      "images": ["/illustrations/menu/i020.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 21,
+      "groupId": 13,
+      "code": "I021",
+      "name": "Blue Berry Fresh Shake",
+      "price": 15000,
+      "images": ["/illustrations/menu/i021.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 22,
+      "groupId": 5,
+      "code": "I022",
+      "name": "Blue Lagoon",
+      "price": 8000,
+      "images": ["/illustrations/menu/i022.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 23,
+      "groupId": 14,
+      "code": "I023",
+      "name": "Blueberry",
+      "price": 5000,
+      "images": ["/illustrations/menu/i023.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 24,
+      "groupId": 17,
+      "code": "I024",
+      "name": "Blueberry Cake",
+      "price": 75000,
+      "images": ["/illustrations/menu/i024.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 25,
+      "groupId": 4,
+      "code": "I025",
+      "name": "Blueberry Fresh Falooda",
+      "price": 18000,
+      "images": ["/illustrations/menu/i025.svg"],
+      "todaySpecial": true,
+      "dashboardFav": false
+    },
+    {
+      "id": 26,
+      "groupId": 15,
+      "code": "I026",
+      "name": "Blueberry Parfait",
+      "price": 12500,
+      "images": ["/illustrations/menu/i026.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 27,
+      "groupId": 8,
+      "code": "I027",
+      "name": "Blueberry Smoothie",
+      "price": 28000,
+      "images": ["/illustrations/menu/i027.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 28,
+      "groupId": 16,
+      "code": "I028",
+      "name": "Browni Icecream",
+      "price": 8000,
+      "images": ["/illustrations/menu/i028.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 29,
+      "groupId": 17,
+      "code": "I029",
+      "name": "Blueberry Fresh",
+      "price": 110000,
+      "images": ["/illustrations/menu/i029.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 30,
+      "groupId": 17,
+      "code": "I030",
+      "name": "Brownie Tower/Slab",
+      "price": 120000,
+      "images": ["/illustrations/menu/i030.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 31,
+      "groupId": 16,
+      "code": "I031",
+      "name": "Brownie Slice",
+      "price": 5000,
+      "images": ["/illustrations/menu/i031.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 32,
+      "groupId": 3,
+      "code": "I032",
+      "name": "Buns",
+      "price": 6000,
+      "images": ["/illustrations/menu/i032.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 33,
+      "groupId": 20,
+      "code": "I033",
+      "name": "Spicy Zinger Burger",
+      "price": 19900,
+      "images": ["/illustrations/menu/i033.svg"],
+      "todaySpecial": true,
+      "dashboardFav": true
+    },
+    {
+      "id": 34,
+      "groupId": 13,
+      "code": "I034",
+      "name": "Butter Brownie",
+      "price": 10500,
+      "images": ["/illustrations/menu/i034.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 35,
+      "groupId": 19,
+      "code": "I035",
+      "name": "Butter Cake",
+      "price": 50000,
+      "images": ["/illustrations/menu/i035.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 36,
+      "groupId": 1,
+      "code": "I036",
+      "name": "Butter Coffee",
+      "price": 7000,
+      "images": ["/illustrations/menu/i036.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 37,
+      "groupId": 19,
+      "code": "I037",
+      "name": "Butter Nuts Cake",
+      "price": 45000,
+      "images": ["/illustrations/menu/i037.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 38,
+      "groupId": 19,
+      "code": "I038",
+      "name": "Butter Plum",
+      "price": 54000,
+      "images": ["/illustrations/menu/i038.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 39,
+      "groupId": 9,
+      "code": "I039",
+      "name": "Butterscotch",
+      "price": 9500,
+      "images": ["/illustrations/menu/i039.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 40,
+      "groupId": 17,
+      "code": "I040",
+      "name": "Butterscotch Cake",
+      "price": 75000,
+      "images": ["/illustrations/menu/i040.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 41,
+      "groupId": 4,
+      "code": "I041",
+      "name": "Butterscotch Falooda",
+      "price": 12000,
+      "images": ["/illustrations/menu/i041.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 42,
+      "groupId": 1,
+      "code": "I042",
+      "name": "Cappuccino",
+      "price": 9000,
+      "images": ["/illustrations/menu/i042.svg"],
+      "todaySpecial": true,
+      "dashboardFav": true
+    },
+    {
+      "id": 43,
+      "groupId": 2,
+      "code": "I043",
+      "name": "Carrot Orange",
+      "price": 10000,
+      "images": ["/illustrations/menu/i043.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 44,
+      "groupId": 17,
+      "code": "I044",
+      "name": "Cheese Blueberry Fresh",
+      "price": 140000,
+      "images": ["/illustrations/menu/i044.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 45,
+      "groupId": 17,
+      "code": "I045",
+      "name": "Cheese Cake (Crush Topping)",
+      "price": 110000,
+      "images": ["/illustrations/menu/i045.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 46,
+      "groupId": 3,
+      "code": "I046",
+      "name": "Chicken Cutlet",
+      "price": 4000,
+      "images": ["/illustrations/menu/i046.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 47,
+      "groupId": 23,
+      "code": "I047",
+      "name": "Chicken Sandwich",
+      "price": 11000,
+      "images": ["/illustrations/menu/i047.svg"],
+      "todaySpecial": false,
+      "dashboardFav": true
+    },
+    {
+      "id": 48,
+      "groupId": 9,
+      "code": "I048",
+      "name": "Chikoo Fresh",
+      "price": 10000,
+      "images": ["/illustrations/menu/i048.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 49,
+      "groupId": 8,
+      "code": "I049",
+      "name": "Chikoo Smoothie",
+      "price": 12500,
+      "images": ["/illustrations/menu/i049.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 50,
+      "groupId": 3,
+      "code": "I050",
+      "name": "Choco Cookie",
+      "price": 1500,
+      "images": ["/illustrations/menu/i050.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 51,
+      "groupId": 9,
+      "code": "I051",
+      "name": "Chocolate",
+      "price": 10000,
+      "images": ["/illustrations/menu/i051.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 52,
+      "groupId": 17,
+      "code": "I052",
+      "name": "Carrot Cheese Cake",
+      "price": 100000,
+      "images": ["/illustrations/menu/i052.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 53,
+      "groupId": 17,
+      "code": "I053",
+      "name": "Chocolate Mousse",
+      "price": 90000,
+      "images": ["/illustrations/menu/i053.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 54,
+      "groupId": 17,
+      "code": "I054",
+      "name": "Chocolate Oreo Cake",
+      "price": 95000,
+      "images": ["/illustrations/menu/i054.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 55,
+      "groupId": 17,
+      "code": "I055",
+      "name": "Chocolate Overload",
+      "price": 150000,
+      "images": ["/illustrations/menu/i055.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 56,
+      "groupId": 19,
+      "code": "I056",
+      "name": "Chocolate Sponge",
+      "price": 48000,
+      "images": ["/illustrations/menu/i056.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 57,
+      "groupId": 11,
+      "code": "I057",
+      "name": "Chocolate Sundae",
+      "price": 12500,
+      "images": ["/illustrations/menu/i057.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 58,
+      "groupId": 17,
+      "code": "I058",
+      "name": "Chocolate Truffle",
+      "price": 110000,
+      "images": ["/illustrations/menu/i058.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 59,
+      "groupId": 17,
+      "code": "I059",
+      "name": "ChocoRed",
+      "price": 95000,
+      "images": ["/illustrations/menu/i059.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 60,
+      "groupId": 7,
+      "code": "I060",
+      "name": "Citrus Orange",
+      "price": 10000,
+      "images": ["/illustrations/menu/i060.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 61,
+      "groupId": 4,
+      "code": "I061",
+      "name": "Classic Falooda",
+      "price": 11000,
+      "images": ["/illustrations/menu/i061.svg"],
+      "todaySpecial": false,
+      "dashboardFav": true
+    },
+    {
+      "id": 62,
+      "groupId": 13,
+      "code": "I062",
+      "name": "Cocobella",
+      "price": 9500,
+      "images": ["/illustrations/menu/i062.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 63,
+      "groupId": 4,
+      "code": "I063",
+      "name": "Cook N Cream Falooda",
+      "price": 13000,
+      "images": ["/illustrations/menu/i063.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 64,
+      "groupId": 11,
+      "code": "I064",
+      "name": "Cookies & Cream",
+      "price": 12500,
+      "images": ["/illustrations/menu/i064.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 65,
+      "groupId": 13,
+      "code": "I065",
+      "name": "Cookies N Cream",
+      "price": 12500,
+      "images": ["/illustrations/menu/i065.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 66,
+      "groupId": 2,
+      "code": "I066",
+      "name": "Cucumber Gooseberry",
+      "price": 8000,
+      "images": ["/illustrations/menu/i066.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 67,
+      "groupId": 25,
+      "code": "I067",
+      "name": "Dahi Papdi Chaat",
+      "price": 12000,
+      "images": ["/illustrations/menu/i067.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 68,
+      "groupId": 24,
+      "code": "I068",
+      "name": "Dates Almond",
+      "price": 14000,
+      "images": ["/illustrations/menu/i068.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 69,
+      "groupId": 4,
+      "code": "I069",
+      "name": "Death By Chocolate",
+      "price": 12000,
+      "images": ["/illustrations/menu/i069.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 70,
+      "groupId": 18,
+      "code": "I070",
+      "name": "Diet Coke",
+      "price": 5000,
+      "images": ["/illustrations/menu/i070.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 71,
+      "groupId": 8,
+      "code": "I071",
+      "name": "Dragon",
+      "price": 12500,
+      "images": ["/illustrations/menu/i071.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 72,
+      "groupId": 17,
+      "code": "I072",
+      "name": "Dream Cake (Torte)",
+      "price": 100000,
+      "images": ["/illustrations/menu/i072.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 73,
+      "groupId": 17,
+      "code": "I073",
+      "name": "Dulce  De Leche",
+      "price": 110000,
+      "images": ["/illustrations/menu/i073.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 74,
+      "groupId": 1,
+      "code": "I074",
+      "name": "Espresso",
+      "price": 5000,
+      "images": ["/illustrations/menu/i074.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 75,
+      "groupId": 12,
+      "code": "I075",
+      "name": "Extra For Soda",
+      "price": 700,
+      "images": ["/illustrations/menu/i075.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 76,
+      "groupId": 21,
+      "code": "I076",
+      "name": "F.  Fries Piri Piri",
+      "price": 7500,
+      "images": ["/illustrations/menu/i076.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 77,
+      "groupId": 21,
+      "code": "I077",
+      "name": "F. Fries Salt",
+      "price": 6500,
+      "images": ["/illustrations/menu/i077.svg"],
+      "todaySpecial": false,
+      "dashboardFav": true
+    },
+    {
+      "id": 78,
+      "groupId": 17,
+      "code": "I078",
+      "name": "Fresh Fruit Cake",
+      "price": 140000,
+      "images": ["/illustrations/menu/i078.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 79,
+      "groupId": 17,
+      "code": "I079",
+      "name": "Fresh Fruit Cheese Cake",
+      "price": 140000,
+      "images": ["/illustrations/menu/i079.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 80,
+      "groupId": 16,
+      "code": "I080",
+      "name": "Fresh Mango Sago",
+      "price": 12500,
+      "images": ["/illustrations/menu/i080.svg"],
+      "todaySpecial": true,
+      "dashboardFav": false
+    },
+    {
+      "id": 81,
+      "groupId": 11,
+      "code": "I081",
+      "name": "Fruits Salad",
+      "price": 7000,
+      "images": ["/illustrations/menu/i081.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 82,
+      "groupId": 11,
+      "code": "I082",
+      "name": "Fruits Salad Jumbo",
+      "price": 10000,
+      "images": ["/illustrations/menu/i082.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 83,
+      "groupId": 3,
+      "code": "I083",
+      "name": "Garlic Bread",
+      "price": 9000,
+      "images": ["/illustrations/menu/i083.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 84,
+      "groupId": 12,
+      "code": "I084",
+      "name": "Ginger Lime",
+      "price": 3000,
+      "images": ["/illustrations/menu/i084.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 85,
+      "groupId": 12,
+      "code": "I085",
+      "name": "Ginger Mint",
+      "price": 3000,
+      "images": ["/illustrations/menu/i085.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 86,
+      "groupId": 5,
+      "code": "I086",
+      "name": "Green Apple",
+      "price": 8000,
+      "images": ["/illustrations/menu/i086.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 87,
+      "groupId": 1,
+      "code": "I087",
+      "name": "Green Tea",
+      "price": 2500,
+      "images": ["/illustrations/menu/i087.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 88,
+      "groupId": 1,
+      "code": "I088",
+      "name": "Hot Chocolate",
+      "price": 9000,
+      "images": ["/illustrations/menu/i088.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 89,
+      "groupId": 6,
+      "code": "I089",
+      "name": "Irish Caramel",
+      "price": 11000,
+      "images": ["/illustrations/menu/i089.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 90,
+      "groupId": 16,
+      "code": "I090",
+      "name": "Jar 50",
+      "price": 5000,
+      "images": ["/illustrations/menu/i090.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 91,
+      "groupId": 18,
+      "code": "I091",
+      "name": "Juice 10",
+      "price": 1000,
+      "images": ["/illustrations/menu/i091.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 92,
+      "groupId": 1,
+      "code": "I092",
+      "name": "Kattan Chai",
+      "price": 2500,
+      "images": ["/illustrations/menu/i092.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 93,
+      "groupId": 13,
+      "code": "I093",
+      "name": "Kitkat",
+      "price": 10500,
+      "images": ["/illustrations/menu/i093.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 94,
+      "groupId": 18,
+      "code": "I094",
+      "name": "kitkat 10",
+      "price": 1000,
+      "images": ["/illustrations/menu/i094.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 95,
+      "groupId": 17,
+      "code": "I095",
+      "name": "KitKat Gems",
+      "price": 120000,
+      "images": ["/illustrations/menu/i095.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 96,
+      "groupId": 17,
+      "code": "I096",
+      "name": "Saffron Kulfi Cake",
+      "price": 100000,
+      "images": ["/illustrations/menu/i096.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 97,
+      "groupId": 1,
+      "code": "I097",
+      "name": "Latte Macchiato",
+      "price": 9000,
+      "images": ["/illustrations/menu/i097.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 98,
+      "groupId": 10,
+      "code": "I098",
+      "name": "Lemon",
+      "price": 5000,
+      "images": ["/illustrations/menu/i098.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 99,
+      "groupId": 12,
+      "code": "I099",
+      "name": "Lime",
+      "price": 2500,
+      "images": ["/illustrations/menu/i099.svg"],
+      "todaySpecial": false,
+      "dashboardFav": true
+    },
+    {
+      "id": 100,
+      "groupId": 1,
+      "code": "I100",
+      "name": "Lime Tea",
+      "price": 3000,
+      "images": ["/illustrations/menu/i100.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 101,
+      "groupId": 9,
+      "code": "I101",
+      "name": "Litchi Shake",
+      "price": 9500,
+      "images": ["/illustrations/menu/i101.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 102,
+      "groupId": 21,
+      "code": "I102",
+      "name": "Butter Chicken Loaded",
+      "price": 18000,
+      "images": ["/illustrations/menu/i102.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 103,
+      "groupId": 16,
+      "code": "I103",
+      "name": "Malai Kulfi",
+      "price": 5000,
+      "images": ["/illustrations/menu/i103.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 104,
+      "groupId": 14,
+      "code": "I104",
+      "name": "Mango",
+      "price": 5000,
+      "images": ["/illustrations/menu/i104.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 105,
+      "groupId": 15,
+      "code": "I105",
+      "name": "Mango Bango",
+      "price": 12500,
+      "images": ["/illustrations/menu/i105.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 106,
+      "groupId": 17,
+      "code": "I106",
+      "name": "Mango Cake",
+      "price": 75000,
+      "images": ["/illustrations/menu/i106.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 107,
+      "groupId": 4,
+      "code": "I107",
+      "name": "Mango Falooda",
+      "price": 12000,
+      "images": ["/illustrations/menu/i107.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 108,
+      "groupId": 17,
+      "code": "I108",
+      "name": "Mango Fresh",
+      "price": 90000,
+      "images": ["/illustrations/menu/i108.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 109,
+      "groupId": 11,
+      "code": "I109",
+      "name": "Merry Berries",
+      "price": 12500,
+      "images": ["/illustrations/menu/i109.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 110,
+      "groupId": 14,
+      "code": "I110",
+      "name": "Milk Sarbath",
+      "price": 6000,
+      "images": ["/illustrations/menu/i110.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 111,
+      "groupId": 12,
+      "code": "I111",
+      "name": "Mint Lime",
+      "price": 3000,
+      "images": ["/illustrations/menu/i111.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 112,
+      "groupId": 24,
+      "code": "I112",
+      "name": "Mixed Dry Fruits",
+      "price": 16000,
+      "images": ["/illustrations/menu/i112.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 113,
+      "groupId": 7,
+      "code": "I113",
+      "name": "Mixed Juice",
+      "price": 7500,
+      "images": ["/illustrations/menu/i113.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 114,
+      "groupId": 1,
+      "code": "I114",
+      "name": "Mocca",
+      "price": 10000,
+      "images": ["/illustrations/menu/i114.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 115,
+      "groupId": 6,
+      "code": "I115",
+      "name": "Mocca Blast",
+      "price": 11000,
+      "images": ["/illustrations/menu/i115.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 116,
+      "groupId": 11,
+      "code": "I116",
+      "name": "Mocca Caramel",
+      "price": 13000,
+      "images": ["/illustrations/menu/i116.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 117,
+      "groupId": 18,
+      "code": "I117",
+      "name": "Monster 125",
+      "price": 12500,
+      "images": ["/illustrations/menu/i117.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 118,
+      "groupId": 3,
+      "code": "I118",
+      "name": "Muffin Cashew",
+      "price": 4500,
+      "images": ["/illustrations/menu/i118.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 119,
+      "groupId": 3,
+      "code": "I119",
+      "name": "Muffin Walnut",
+      "price": 4500,
+      "images": ["/illustrations/menu/i119.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 120,
+      "groupId": 14,
+      "code": "I120",
+      "name": "Nannari",
+      "price": 5000,
+      "images": ["/illustrations/menu/i120.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 121,
+      "groupId": 17,
+      "code": "I121",
+      "name": "Neapolitan Cake",
+      "price": 120000,
+      "images": ["/illustrations/menu/i121.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 122,
+      "groupId": 12,
+      "code": "I122",
+      "name": "Nellikka Kanthari",
+      "price": 3500,
+      "images": ["/illustrations/menu/i122.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 123,
+      "groupId": 4,
+      "code": "I123",
+      "name": "Nutty Bubble Falooda",
+      "price": 15000,
+      "images": ["/illustrations/menu/i123.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 124,
+      "groupId": 17,
+      "code": "I124",
+      "name": "Nutty Bubble Cake",
+      "price": 90000,
+      "images": ["/illustrations/menu/i124.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 125,
+      "groupId": 7,
+      "code": "I125",
+      "name": "Orange",
+      "price": 9000,
+      "images": ["/illustrations/menu/i125.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 126,
+      "groupId": 5,
+      "code": "I126",
+      "name": "Orange Fizz",
+      "price": 8000,
+      "images": ["/illustrations/menu/i126.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 127,
+      "groupId": 13,
+      "code": "I127",
+      "name": "Oreo Shake",
+      "price": 10500,
+      "images": ["/illustrations/menu/i127.svg"],
+      "todaySpecial": false,
+      "dashboardFav": true
+    },
+    {
+      "id": 128,
+      "groupId": 23,
+      "code": "I128",
+      "name": "Paneer Sandwich",
+      "price": 14000,
+      "images": ["/illustrations/menu/i128.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 129,
+      "groupId": 18,
+      "code": "I129",
+      "name": "Parcel",
+      "price": 500,
+      "images": ["/illustrations/menu/i129.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 130,
+      "groupId": 5,
+      "code": "I130",
+      "name": "Passion",
+      "price": 8000,
+      "images": ["/illustrations/menu/i130.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 131,
+      "groupId": 22,
+      "code": "I131",
+      "name": "Pastry 100",
+      "price": 10000,
+      "images": ["/illustrations/menu/i131.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 132,
+      "groupId": 22,
+      "code": "I132",
+      "name": "Pastry 110",
+      "price": 11000,
+      "images": ["/illustrations/menu/i132.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 133,
+      "groupId": 22,
+      "code": "I133",
+      "name": "Pastry 120",
+      "price": 12000,
+      "images": ["/illustrations/menu/i133.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 134,
+      "groupId": 22,
+      "code": "I134",
+      "name": "Pastry 125",
+      "price": 12500,
+      "images": ["/illustrations/menu/i134.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 135,
+      "groupId": 22,
+      "code": "I135",
+      "name": "Pastry 150",
+      "price": 15000,
+      "images": ["/illustrations/menu/i135.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 136,
+      "groupId": 22,
+      "code": "I136",
+      "name": "Pastry 180",
+      "price": 18000,
+      "images": ["/illustrations/menu/i136.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 137,
+      "groupId": 22,
+      "code": "I137",
+      "name": "Pastry 50",
+      "price": 5000,
+      "images": ["/illustrations/menu/i137.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 138,
+      "groupId": 22,
+      "code": "I138",
+      "name": "Pastry 60",
+      "price": 6000,
+      "images": ["/illustrations/menu/i138.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 139,
+      "groupId": 22,
+      "code": "I139",
+      "name": "Pastry 70",
+      "price": 7000,
+      "images": ["/illustrations/menu/i139.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 140,
+      "groupId": 22,
+      "code": "I140",
+      "name": "Pastry 80",
+      "price": 8000,
+      "images": ["/illustrations/menu/i140.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 141,
+      "groupId": 22,
+      "code": "I141",
+      "name": "Pastry 85",
+      "price": 8500,
+      "images": ["/illustrations/menu/i141.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 142,
+      "groupId": 22,
+      "code": "I142",
+      "name": "Pastry 90",
+      "price": 9000,
+      "images": ["/illustrations/menu/i142.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 143,
+      "groupId": 22,
+      "code": "I143",
+      "name": "Pastry 95",
+      "price": 9500,
+      "images": ["/illustrations/menu/i143.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 144,
+      "groupId": 16,
+      "code": "I144",
+      "name": "Pastry Cup",
+      "price": 3000,
+      "images": ["/illustrations/menu/i144.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 145,
+      "groupId": 22,
+      "code": "I145",
+      "name": "Pastry Cup 40",
+      "price": 4000,
+      "images": ["/illustrations/menu/i145.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 146,
+      "groupId": 25,
+      "code": "I146",
+      "name": "Pav Bhaji",
+      "price": 12000,
+      "images": ["/illustrations/menu/i146.svg"],
+      "todaySpecial": true,
+      "dashboardFav": true
+    },
+    {
+      "id": 147,
+      "groupId": 10,
+      "code": "I147",
+      "name": "Peach",
+      "price": 5000,
+      "images": ["/illustrations/menu/i147.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 148,
+      "groupId": 7,
+      "code": "I148",
+      "name": "Pineapple",
+      "price": 9000,
+      "images": ["/illustrations/menu/i148.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 149,
+      "groupId": 17,
+      "code": "I149",
+      "name": "Pineapple Cake",
+      "price": 65000,
+      "images": ["/illustrations/menu/i149.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 150,
+      "groupId": 2,
+      "code": "I150",
+      "name": "Pineapple Cucumber",
+      "price": 9000,
+      "images": ["/illustrations/menu/i150.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 151,
+      "groupId": 17,
+      "code": "I151",
+      "name": "Pineapple Fresh",
+      "price": 80000,
+      "images": ["/illustrations/menu/i151.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 152,
+      "groupId": 12,
+      "code": "I152",
+      "name": "Pineapple Lime",
+      "price": 4000,
+      "images": ["/illustrations/menu/i152.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 153,
+      "groupId": 9,
+      "code": "I153",
+      "name": "Pista",
+      "price": 10000,
+      "images": ["/illustrations/menu/i153.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 154,
+      "groupId": 4,
+      "code": "I154",
+      "name": "Pista Falooda",
+      "price": 13000,
+      "images": ["/illustrations/menu/i154.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 155,
+      "groupId": 19,
+      "code": "I155",
+      "name": "Plum Slice",
+      "price": 2000,
+      "images": ["/illustrations/menu/i155.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 156,
+      "groupId": 19,
+      "code": "I156",
+      "name": "Premium Butter Plum",
+      "price": 60000,
+      "images": ["/illustrations/menu/i156.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 157,
+      "groupId": 18,
+      "code": "I157",
+      "name": "Pringles 110",
+      "price": 11000,
+      "images": ["/illustrations/menu/i157.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 158,
+      "groupId": 18,
+      "code": "I158",
+      "name": "Pringles 120",
+      "price": 12000,
+      "images": ["/illustrations/menu/i158.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 159,
+      "groupId": 17,
+      "code": "I159",
+      "name": "Rafaello Cake",
+      "price": 120000,
+      "images": ["/illustrations/menu/i159.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 160,
+      "groupId": 13,
+      "code": "I160",
+      "name": "Rasmalai",
+      "price": 9500,
+      "images": ["/illustrations/menu/i160.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 161,
+      "groupId": 3,
+      "code": "I161",
+      "name": "Rava Kesari",
+      "price": 4500,
+      "images": ["/illustrations/menu/i161.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 162,
+      "groupId": 17,
+      "code": "I162",
+      "name": "Red Bee Cake",
+      "price": 120000,
+      "images": ["/illustrations/menu/i162.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 163,
+      "groupId": 18,
+      "code": "I163",
+      "name": "Red Bull",
+      "price": 12500,
+      "images": ["/illustrations/menu/i163.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 164,
+      "groupId": 14,
+      "code": "I164",
+      "name": "Red Guava",
+      "price": 5000,
+      "images": ["/illustrations/menu/i164.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 165,
+      "groupId": 17,
+      "code": "I165",
+      "name": "Red Velvet",
+      "price": 80000,
+      "images": ["/illustrations/menu/i165.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 166,
+      "groupId": 17,
+      "code": "I166",
+      "name": "Red Velvet Cheese",
+      "price": 100000,
+      "images": ["/illustrations/menu/i166.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 167,
+      "groupId": 4,
+      "code": "I167",
+      "name": "Red Velvet Falooda",
+      "price": 14000,
+      "images": ["/illustrations/menu/i167.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 168,
+      "groupId": 13,
+      "code": "I168",
+      "name": "Redvelvet Shake",
+      "price": 12000,
+      "images": ["/illustrations/menu/i168.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 169,
+      "groupId": 14,
+      "code": "I169",
+      "name": "Rooh Afza",
+      "price": 5000,
+      "images": ["/illustrations/menu/i169.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 170,
+      "groupId": 4,
+      "code": "I170",
+      "name": "Royal Rose Falooda",
+      "price": 13000,
+      "images": ["/illustrations/menu/i170.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 171,
+      "groupId": 17,
+      "code": "I171",
+      "name": "Russian Honey Cake",
+      "price": 120000,
+      "images": ["/illustrations/menu/i171.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 172,
+      "groupId": 25,
+      "code": "I172",
+      "name": "Saffron Lassi",
+      "price": 6500,
+      "images": ["/illustrations/menu/i172.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 173,
+      "groupId": 25,
+      "code": "I173",
+      "name": "Samosa Chaat",
+      "price": 10000,
+      "images": ["/illustrations/menu/i173.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 174,
+      "groupId": 3,
+      "code": "I174",
+      "name": "Samosa Chicken",
+      "price": 3000,
+      "images": ["/illustrations/menu/i174.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 175,
+      "groupId": 3,
+      "code": "I175",
+      "name": "Samosa Paneer",
+      "price": 3500,
+      "images": ["/illustrations/menu/i175.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 176,
+      "groupId": 3,
+      "code": "I176",
+      "name": "Samosa Veg.",
+      "price": 2500,
+      "images": ["/illustrations/menu/i176.svg"],
+      "todaySpecial": false,
+      "dashboardFav": true
+    },
+    {
+      "id": 177,
+      "groupId": 22,
+      "code": "I177",
+      "name": "San Sebastn",
+      "price": 19000,
+      "images": ["/illustrations/menu/i177.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 178,
+      "groupId": 11,
+      "code": "I178",
+      "name": "Scoop IC 50",
+      "price": 5000,
+      "images": ["/illustrations/menu/i178.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 179,
+      "groupId": 11,
+      "code": "I179",
+      "name": "Scoop IC 35",
+      "price": 3500,
+      "images": ["/illustrations/menu/i179.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 180,
+      "groupId": 16,
+      "code": "I180",
+      "name": "Shaahi Pudng",
+      "price": 90000,
+      "images": ["/illustrations/menu/i180.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 181,
+      "groupId": 9,
+      "code": "I181",
+      "name": "Sharja Cutting",
+      "price": 3000,
+      "images": ["/illustrations/menu/i181.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 182,
+      "groupId": 9,
+      "code": "I182",
+      "name": "Sharjah",
+      "price": 7000,
+      "images": ["/illustrations/menu/i182.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 183,
+      "groupId": 1,
+      "code": "I183",
+      "name": "SHOT",
+      "price": 3000,
+      "images": ["/illustrations/menu/i183.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 184,
+      "groupId": 16,
+      "code": "I184",
+      "name": "Sizzler Brownie",
+      "price": 11000,
+      "images": ["/illustrations/menu/i184.svg"],
+      "todaySpecial": true,
+      "dashboardFav": true
+    },
+    {
+      "id": 185,
+      "groupId": 17,
+      "code": "I185",
+      "name": "Snickers Cake",
+      "price": 100000,
+      "images": ["/illustrations/menu/i185.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 186,
+      "groupId": 12,
+      "code": "I186",
+      "name": "Soda Lime",
+      "price": 3500,
+      "images": ["/illustrations/menu/i186.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 187,
+      "groupId": 18,
+      "code": "I187",
+      "name": "Soft Drink",
+      "price": 1000,
+      "images": ["/illustrations/menu/i187.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 188,
+      "groupId": 18,
+      "code": "I188",
+      "name": "Soft drinks 20",
+      "price": 2000,
+      "images": ["/illustrations/menu/i188.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 189,
+      "groupId": 18,
+      "code": "I189",
+      "name": "Soft Drinks Can",
+      "price": 4000,
+      "images": ["/illustrations/menu/i189.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 190,
+      "groupId": 4,
+      "code": "I190",
+      "name": "Spanish Del Falooda",
+      "price": 15000,
+      "images": ["/illustrations/menu/i190.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 191,
+      "groupId": 13,
+      "code": "I191",
+      "name": "Spanish Delight",
+      "price": 13000,
+      "images": ["/illustrations/menu/i191.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 192,
+      "groupId": 17,
+      "code": "I192",
+      "name": "Spanish Delight Cake",
+      "price": 95000,
+      "images": ["/illustrations/menu/i192.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 193,
+      "groupId": 5,
+      "code": "I193",
+      "name": "Sparkling Strawberry",
+      "price": 8000,
+      "images": ["/illustrations/menu/i193.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 194,
+      "groupId": 17,
+      "code": "I194",
+      "name": "Strawberry Cake",
+      "price": 65000,
+      "images": ["/illustrations/menu/i194.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 195,
+      "groupId": 4,
+      "code": "I195",
+      "name": "Strawberry Fresh",
+      "price": 15000,
+      "images": ["/illustrations/menu/i195.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 196,
+      "groupId": 14,
+      "code": "I196",
+      "name": "Strawberry Icetea",
+      "price": 5000,
+      "images": ["/illustrations/menu/i196.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 197,
+      "groupId": 15,
+      "code": "I197",
+      "name": "Strawberry Parfait",
+      "price": 12500,
+      "images": ["/illustrations/menu/i197.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 198,
+      "groupId": 14,
+      "code": "I198",
+      "name": "Strawberry sarbath",
+      "price": 5000,
+      "images": ["/illustrations/menu/i198.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 199,
+      "groupId": 9,
+      "code": "I199",
+      "name": "Strawberry Shake",
+      "price": 9500,
+      "images": ["/illustrations/menu/i199.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 200,
+      "groupId": 17,
+      "code": "I200",
+      "name": "Strawbwrry Fresh Cake",
+      "price": 110000,
+      "images": ["/illustrations/menu/i200.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 201,
+      "groupId": 5,
+      "code": "I201",
+      "name": "Sunset",
+      "price": 9500,
+      "images": ["/illustrations/menu/i201.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 202,
+      "groupId": 12,
+      "code": "I202",
+      "name": "Swiss lemon",
+      "price": 5000,
+      "images": ["/illustrations/menu/i202.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 203,
+      "groupId": 17,
+      "code": "I203",
+      "name": "Tender Coconut Cake",
+      "price": 100000,
+      "images": ["/illustrations/menu/i203.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 204,
+      "groupId": 4,
+      "code": "I204",
+      "name": "Tender Coconut Fal",
+      "price": 18000,
+      "images": ["/illustrations/menu/i204.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 205,
+      "groupId": 17,
+      "code": "I205",
+      "name": "Tiramisu",
+      "price": 100000,
+      "images": ["/illustrations/menu/i205.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 206,
+      "groupId": 17,
+      "code": "I206",
+      "name": "Tres Leches",
+      "price": 100000,
+      "images": ["/illustrations/menu/i206.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 207,
+      "groupId": 8,
+      "code": "I207",
+      "name": "Tropical Fruits",
+      "price": 12500,
+      "images": ["/illustrations/menu/i207.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 208,
+      "groupId": 11,
+      "code": "I208",
+      "name": "Tropical Sundae",
+      "price": 12500,
+      "images": ["/illustrations/menu/i208.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 209,
+      "groupId": 8,
+      "code": "I209",
+      "name": "Tzatziki (Yogurt Salad)",
+      "price": 12500,
+      "images": ["/illustrations/menu/i209.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 210,
+      "groupId": 17,
+      "code": "I210",
+      "name": "Vancho Black",
+      "price": 90000,
+      "images": ["/illustrations/menu/i210.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 211,
+      "groupId": 17,
+      "code": "I211",
+      "name": "Vancho White",
+      "price": 95000,
+      "images": ["/illustrations/menu/i211.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 212,
+      "groupId": 9,
+      "code": "I212",
+      "name": "Vanilla",
+      "price": 7000,
+      "images": ["/illustrations/menu/i212.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 213,
+      "groupId": 17,
+      "code": "I213",
+      "name": "Vanilla Royal",
+      "price": 60000,
+      "images": ["/illustrations/menu/i213.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 214,
+      "groupId": 18,
+      "code": "I214",
+      "name": "Walnut",
+      "price": 135000,
+      "images": ["/illustrations/menu/i214.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 215,
+      "groupId": 18,
+      "code": "I215",
+      "name": "Water 10",
+      "price": 900,
+      "images": ["/illustrations/menu/i215.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 216,
+      "groupId": 18,
+      "code": "I216",
+      "name": "Water Kinley 20",
+      "price": 1800,
+      "images": ["/illustrations/menu/i216.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 217,
+      "groupId": 7,
+      "code": "I217",
+      "name": "Watermelon",
+      "price": 5000,
+      "images": ["/illustrations/menu/i217.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 218,
+      "groupId": 17,
+      "code": "I218",
+      "name": "White Forest",
+      "price": 65000,
+      "images": ["/illustrations/menu/i218.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 219,
+      "groupId": 4,
+      "code": "I219",
+      "name": "Black Current Falooda",
+      "price": 13000,
+      "images": ["/illustrations/menu/i219.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 220,
+      "groupId": 17,
+      "code": "I220",
+      "name": "Mint and Cookies",
+      "price": 100000,
+      "images": ["/illustrations/menu/i220.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 221,
+      "groupId": 17,
+      "code": "I221",
+      "name": "Tropical Mango",
+      "price": 110000,
+      "images": ["/illustrations/menu/i221.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 222,
+      "groupId": 17,
+      "code": "I222",
+      "name": "Belgian Chocolate",
+      "price": 160000,
+      "images": ["/illustrations/menu/i222.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 223,
+      "groupId": 17,
+      "code": "I223",
+      "name": "Ferrero Rocher",
+      "price": 160000,
+      "images": ["/illustrations/menu/i223.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 224,
+      "groupId": 17,
+      "code": "I224",
+      "name": "Lotus Biscoff Cheesecake",
+      "price": 180000,
+      "images": ["/illustrations/menu/i224.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 225,
+      "groupId": 17,
+      "code": "I225",
+      "name": "Chocolate Mocca Noir",
+      "price": 120000,
+      "images": ["/illustrations/menu/i225.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 226,
+      "groupId": 13,
+      "code": "I226",
+      "name": "Lotus Biscoff Shake",
+      "price": 16000,
+      "images": ["/illustrations/menu/i226.svg"],
+      "todaySpecial": true,
+      "dashboardFav": false
+    },
+    {
+      "id": 227,
+      "groupId": 13,
+      "code": "I227",
+      "name": "Strawberry Oreo Shake",
+      "price": 12000,
+      "images": ["/illustrations/menu/i227.svg"],
+      "todaySpecial": false,
+      "dashboardFav": false
+    },
+    {
+      "id": 228,
+      "groupId": 25,
+      "code": "I228",
+      "name": "Mango Lassi",
+      "price": 6500,
+      "images": ["/illustrations/menu/i228.svg"],
+      "todaySpecial": false,
+      "dashboardFav": true
+    }
+  ]
+}

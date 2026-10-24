@@ -3,56 +3,21 @@ import { readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import worker, { type Env } from "../../workers/app.js";
 import type { D1Database, D1Statement, D1Result } from "../../workers/d1.js";
-import { seed } from "../../server/db.js";
 export function openWorkersDatabase() {
   const db = new DatabaseSync(":memory:");
   db.exec("PRAGMA foreign_keys=ON");
   db.exec(
     readFileSync(
-      new URL("../../migrations/0001_initial.sql", import.meta.url),
+      new URL("../../migrations/0001_cafe77.sql", import.meta.url),
       "utf8",
     ),
   );
   db.exec(
     readFileSync(
-      new URL(
-        "../../migrations/0003_order_messages_menu_details.sql",
-        import.meta.url,
-      ),
+      new URL("../../migrations/0002_order_checkout.sql", import.meta.url),
       "utf8",
     ),
   );
-  db.exec(
-    readFileSync(
-      new URL("../../migrations/0004_message_read_state.sql", import.meta.url),
-      "utf8",
-    ),
-  );
-  db.exec(
-    readFileSync(
-      new URL(
-        "../../migrations/0005_menu_history_counter_orders.sql",
-        import.meta.url,
-      ),
-      "utf8",
-    ),
-  );
-  db.exec(
-    readFileSync(
-      new URL(
-        "../../migrations/0006_tags_counter_visibility.sql",
-        import.meta.url,
-      ),
-      "utf8",
-    ),
-  );
-  db.exec(
-    readFileSync(
-      new URL("../../migrations/0007_admin_role.sql", import.meta.url),
-      "utf8",
-    ),
-  );
-  seed(db);
   return db;
 }
 /** SQL integration double: real SQLite, D1-shaped async API and rollback semantics.

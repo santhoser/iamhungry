@@ -195,7 +195,7 @@ export async function handleApi(request: globalThis.Request, env: Env) {
     res.status(204).end();
   });
   const orderSelect = `SELECT o.*,t.number AS table_number,
-      (SELECT json_group_array(json_object('kind',p.kind,'amount',p.amount,'actor',p.actor,'at',p.at)) FROM (SELECT * FROM payments WHERE order_id=o.id ORDER BY id) p) AS payment_rows,
+      (SELECT json_group_array(json_object('kind',p.kind,'amount',p.amount,'actor',p.actor,'at',p.at,'mode',p.mode)) FROM (SELECT * FROM payments WHERE order_id=o.id ORDER BY id) p) AS payment_rows,
       (SELECT json_group_array(json_object('itemId',i.item_id,'code',i.code,'name',i.name,'price',i.price,'quantity',i.quantity)) FROM (SELECT * FROM order_items WHERE order_id=o.id ORDER BY id) i) AS item_rows,
       (SELECT json_group_array(json_object('itemId',-i.id,'code','CUSTOM','name',i.name,'price',i.price,'quantity',i.quantity,'custom',1)) FROM (SELECT * FROM order_custom_items WHERE order_id=o.id ORDER BY id) i) AS custom_item_rows,
       (SELECT json_group_array(json_object('previous',e.previous,'status',e.status,'reason',e.reason,'actor',e.actor,'at',e.at)) FROM (SELECT * FROM events WHERE order_id=o.id ORDER BY id) e) AS event_rows,
@@ -211,6 +211,8 @@ export async function handleApi(request: globalThis.Request, env: Env) {
       name: row.name,
       email: row.email,
       phone: row.phone,
+      orderType: row.order_type,
+      paymentMode: row.payment_mode,
       status: row.status,
       createdAt: row.created_at,
       closedAt: row.closed_at,
@@ -317,11 +319,17 @@ export async function handleApi(request: globalThis.Request, env: Env) {
         email: z
           .union([z.string().email().max(150), z.literal("")])
           .default(""),
-        phone: z
-          .string()
-          .max(25)
-          .regex(/^[+\d\s()-]*$/)
-          .default(""),
+        phone: counter
+          ? z
+              .string()
+              .trim()
+              .regex(/^(\d{10})?$/, "Enter a 10 digit phone number")
+              .default("")
+          : z
+              .string()
+              .trim()
+              .regex(/^\d{10}$/, "Enter a 10 digit phone number"),
+        orderType: z.enum(["DineIn", "TakeAway"]).default("DineIn"),
         requestKey: z.string().uuid(),
         items: z
           .array(
@@ -402,7 +410,7 @@ export async function handleApi(request: globalThis.Request, env: Env) {
       const now = placedAt.toISOString();
       const row = await db
         .prepare(
-          "INSERT INTO orders(number,token,request_key,request_hash,table_id,name,email,phone,created_at,amounts,restaurant) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+          "INSERT INTO orders(number,token,request_key,request_hash,table_id,name,email,phone,order_type,created_at,amounts,restaurant) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
         )
         .run(
           number,
@@ -413,6 +421,7 @@ export async function handleApi(request: globalThis.Request, env: Env) {
           input.name,
           input.email,
           input.phone,
+          input.orderType,
           now,
           JSON.stringify(amounts),
           JSON.stringify(cfg),
@@ -925,6 +934,16 @@ export async function handleApi(request: globalThis.Request, env: Env) {
     });
     res.json({ ok: true });
   });
+  app.get("/api/admin/order-alerts", async (req, res) => {
+    await staff(req);
+    res.json(
+      await db
+        .prepare(
+          "SELECT o.id, COALESCE((SELECT MAX(m.id) FROM order_messages m WHERE m.order_id=o.id AND m.sender='customer'),0) AS messageId FROM orders o WHERE o.status NOT IN ('Closed','Cancelled')",
+        )
+        .all(),
+    );
+  });
   app.get("/api/admin/orders", async (req, res) => {
     await staff(req);
     const page = z.coerce
@@ -938,6 +957,9 @@ export async function handleApi(request: globalThis.Request, env: Env) {
       .string()
       .max(100)
       .parse(req.query.q || "");
+    const paymentMode = z
+      .enum(["", "Cash", "UPI", "Unknown"])
+      .parse(req.query.paymentMode || "");
     const statuses = z
       .string()
       .max(100)
@@ -966,15 +988,31 @@ export async function handleApi(request: globalThis.Request, env: Env) {
       (statuses.length
         ? ` AND o.status IN (${statuses.map(() => "?").join(",")})`
         : "");
-    const params = [from, to, pattern, pattern, pattern, pattern, ...statuses];
+    const paymentWhere =
+      paymentMode === "Unknown"
+        ? " AND o.payment_mode IS NULL"
+        : paymentMode
+          ? " AND o.payment_mode=?"
+          : "";
+    const filteredWhere = where + paymentWhere;
+    const params = [
+      from,
+      to,
+      pattern,
+      pattern,
+      pattern,
+      pattern,
+      ...statuses,
+      ...(paymentMode && paymentMode !== "Unknown" ? [paymentMode] : []),
+    ];
     const count: any = await db
-      .prepare("SELECT count(*) AS count FROM orders o WHERE " + where)
+      .prepare("SELECT count(*) AS count FROM orders o WHERE " + filteredWhere)
       .get(...params);
     const rows = await db
       .prepare(
         orderSelect +
           " WHERE " +
-          where +
+          filteredWhere +
           " ORDER BY o.id DESC LIMIT ? OFFSET ?",
       )
       .all(...params, active ? 100 : 20, (page - 1) * (active ? 100 : 20));
@@ -1107,6 +1145,7 @@ export async function handleApi(request: globalThis.Request, env: Env) {
           "Closed",
           "Cancelled",
         ]),
+        paymentMode: z.enum(["Cash", "UPI"]).optional(),
         reason: z.string().max(500).default(""),
         version: z.number().int(),
       })
@@ -1118,8 +1157,8 @@ export async function handleApi(request: globalThis.Request, env: Env) {
           fail(409, "Order changed. Refresh and try again.");
         if (!transitions[o.status as Status].includes(input.status))
           fail(409, "This status transition is not allowed");
-        if (input.status === "Closed" && o.paid - o.refunded < o.amounts.total)
-          fail(409, "Record full payment before closing");
+        if (input.status === "Closed" && !input.paymentMode && !o.paymentMode)
+          fail(409, "Choose a payment mode and confirm payment before closing");
         if (input.status === "New") {
           if (
             !(await db
@@ -1149,6 +1188,29 @@ export async function handleApi(request: globalThis.Request, env: Env) {
             fail(409, "An item is unavailable; this order cannot be reopened.");
         }
         const now = new Date().toISOString();
+        if (input.status === "Closed") {
+          const mode = input.paymentMode || o.paymentMode;
+          const outstanding = Math.max(
+            0,
+            o.amounts.total - o.paid + o.refunded,
+          );
+          if (outstanding > 0) {
+            await db
+              .prepare(
+                "INSERT INTO payments(order_id,kind,amount,actor,at,mode) VALUES(?,'payment',?,?,?,?)",
+              )
+              .run(o.id, outstanding, u.username, now, mode);
+          }
+          await db
+            .prepare("UPDATE orders SET payment_mode=? WHERE id=?")
+            .run(mode, o.id);
+          await audit(u.username, "order.close", {
+            id: o.id,
+            paymentMode: mode,
+            amount: outstanding,
+          });
+        }
+
         await db
           .prepare(
             "UPDATE orders SET status=?,closed_at=?,version=version+1 WHERE id=?",
@@ -1168,6 +1230,7 @@ export async function handleApi(request: globalThis.Request, env: Env) {
     const input = z
       .object({
         kind: z.enum(["payment", "refund"]),
+        paymentMode: z.enum(["Cash", "UPI"]).optional(),
         version: z.number().int(),
       })
       .parse(req.body);
@@ -1176,6 +1239,8 @@ export async function handleApi(request: globalThis.Request, env: Env) {
         const o = await getOrder(idParam(req));
         if (o.version !== input.version)
           fail(409, "Order changed. Refresh and try again.");
+        if (input.kind === "payment" && !input.paymentMode)
+          fail(400, "Choose a payment mode");
         const net = o.paid - o.refunded;
         const amount = input.kind === "refund" ? net : o.amounts.total - net;
         if (amount <= 0) fail(409, "No outstanding amount");
@@ -1188,12 +1253,23 @@ export async function handleApi(request: globalThis.Request, env: Env) {
           fail(409, "Payments cannot be recorded for this order status");
         await db
           .prepare(
-            "INSERT INTO payments(order_id,kind,amount,actor,at) VALUES(?,?,?,?,?)",
+            "INSERT INTO payments(order_id,kind,amount,actor,at,mode) VALUES(?,?,?,?,?,?)",
           )
-          .run(o.id, input.kind, amount, u.username, new Date().toISOString());
+          .run(
+            o.id,
+            input.kind,
+            amount,
+            u.username,
+            new Date().toISOString(),
+            input.kind === "payment" ? input.paymentMode! : o.paymentMode,
+          );
         await db
           .prepare("UPDATE orders SET version=version+1 WHERE id=?")
           .run(o.id);
+        if (input.kind === "payment")
+          await db
+            .prepare("UPDATE orders SET payment_mode=? WHERE id=?")
+            .run(input.paymentMode!, o.id);
         return await getOrder(o.id);
       }),
     );

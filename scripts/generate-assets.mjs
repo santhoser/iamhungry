@@ -1,9 +1,9 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 mkdirSync("public/illustrations", { recursive: true });
 const coffee = `<ellipse cx="260" cy="260" rx="138" ry="34" fill="#c7a07b" opacity=".3"/><ellipse cx="250" cy="242" rx="123" ry="27" fill="#faf0d6"/><ellipse cx="250" cy="240" rx="100" ry="19" fill="#dfceb0"/><path d="M342 126c82-19 82 109 0 91" fill="none" stroke="#eee2c6" stroke-width="23"/><path d="M149 117h203l-17 103c-8 52-159 52-171 0z" fill="url(#cup)"/><ellipse cx="250" cy="118" rx="101" ry="32" fill="#fff6db"/><ellipse cx="250" cy="119" rx="84" ry="23" fill="#805132"/><ellipse cx="250" cy="120" rx="73" ry="19" fill="#c49362"/><path d="M249 132c-68-26-36-46 0-18 38-29 64-8 0 18z" fill="#f3e1bb"/><path d="M209 79c-28-21 27-26 3-51m45 47c-28-24 26-29 0-51m44 56c-22-25 20-29 0-48" fill="none" stroke="#fff1cf" stroke-width="5" stroke-linecap="round" opacity=".65"/><path d="M383 232l42 17" stroke="#a88b68" stroke-width="9" stroke-linecap="round"/>`;
-const plate =
+export const plate =
   '<ellipse cx="250" cy="230" rx="160" ry="85" fill="#cfaf88" opacity=".25"/><ellipse cx="250" cy="214" rx="153" ry="78" fill="#fff8e4"/><ellipse cx="250" cy="213" rx="123" ry="58" fill="#eee0c0"/>';
-const arts = {
+export const arts = {
   coffee,
   tea: coffee.replaceAll("#805132", "#8b4e27").replaceAll("#c49362", "#c7914f"),
   toast:

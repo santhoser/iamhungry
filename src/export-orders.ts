@@ -1,5 +1,6 @@
 import { zipSync, strToU8 } from "fflate";
 import type { Order } from "../shared/domain";
+import { orderTypeLabel, statusLabel } from "../shared/domain";
 import { api } from "./api";
 const exportTime = (date: string) =>
   new Date(date).toLocaleString("en-IN", {
@@ -36,6 +37,7 @@ export async function exportHistory(
   range: { from: string; to: string },
   query: string,
   statuses: string[] = [],
+  paymentMode = "",
 ) {
   const orders: Order[] = [];
   for (let page = 1; ; page++) {
@@ -45,6 +47,7 @@ export async function exportHistory(
       page: String(page),
       current: "false",
       ...(statuses.length ? { statuses: statuses.join(",") } : {}),
+      ...(paymentMode ? { paymentMode } : {}),
     });
     const result = await api<{ orders: Order[]; total: number }>(
       "/admin/orders?" + params,
@@ -71,9 +74,12 @@ export function buildOrderWorkbook(orders: Order[]) {
       "Name",
       "Number of items",
       "Total amount (INR)",
-      "GST (INR)",
+      "CGST (INR)",
+      "SGST (INR)",
       "Date and time (IST)",
       "Status",
+      "Payment mode",
+      "Order type",
     ],
     ...orders.map((o) => [
       o.number,
@@ -81,9 +87,12 @@ export function buildOrderWorkbook(orders: Order[]) {
       o.name,
       o.items.reduce((sum, item) => sum + item.quantity, 0),
       o.amounts.total / 100,
-      o.amounts.gst / 100,
+      o.amounts.cgst === undefined ? "" : o.amounts.cgst / 100,
+      o.amounts.sgst === undefined ? "" : o.amounts.sgst / 100,
       exportTime(o.createdAt),
-      o.status,
+      statusLabel(o.status),
+      o.paymentMode || "Not recorded",
+      orderTypeLabel(o.orderType),
     ]),
   ];
   return buildWorkbook(rows, "Order history");

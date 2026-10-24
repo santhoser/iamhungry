@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -12,7 +12,9 @@ test("existing SQLite users and sessions survive the admin-role upgrade", () => 
   const path = join(dir, "cafe77.sqlite");
   let db = new DatabaseSync(path);
   try {
-    db.exec(readFileSync("migrations/0001_initial.sql", "utf8"));
+    db.exec(
+      "CREATE TABLE users(id INTEGER PRIMARY KEY,username TEXT UNIQUE NOT NULL,password TEXT NOT NULL,role TEXT NOT NULL CHECK(role IN ('owner','cashier')),active INTEGER NOT NULL DEFAULT 1); CREATE TABLE sessions(token TEXT PRIMARY KEY,user_id INTEGER REFERENCES users(id),expires INTEGER NOT NULL);",
+    );
     db.prepare("INSERT INTO users(username,password,role) VALUES(?,?,?)").run(
       "legacyowner",
       "legacy-hash",

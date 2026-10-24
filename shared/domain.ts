@@ -10,7 +10,11 @@ export const transitions: Record<Status, Status[]> = {
   Closed: [],
 };
 export const statusLabel = (s: Status) =>
-  s === "InProgress" ? "In progress" : s;
+  s === "InProgress" ? "Preparing" : s;
+export type PaymentMode = "Cash" | "UPI";
+export type OrderType = "DineIn" | "TakeAway";
+export const orderTypeLabel = (type: OrderType) =>
+  type === "TakeAway" ? "Take-away" : "Dine-in";
 export interface Restaurant {
   name: string;
   tagline: string;
@@ -164,6 +168,8 @@ export interface MenuHistoryEntry {
   after: MenuItem | null;
 }
 export interface Order {
+  orderType: OrderType;
+  paymentMode: PaymentMode | null;
   id: number;
   number: string;
   trackingToken: string;
@@ -187,7 +193,13 @@ export interface Order {
     actor: string;
     at: string;
   }[];
-  payments: { kind: string; amount: number; actor: string; at: string }[];
+  payments: {
+    kind: string;
+    amount: number;
+    actor: string;
+    at: string;
+    mode?: PaymentMode | null;
+  }[];
   messages: {
     id: number;
     sender: "customer" | "staff";

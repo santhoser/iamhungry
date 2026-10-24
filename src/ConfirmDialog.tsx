@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { X } from "lucide-react";
 
 export interface Confirmation {
@@ -13,10 +13,14 @@ export default function ConfirmDialog({
   confirmation,
   busy,
   onClose,
+  children,
+  confirmDisabled = false,
 }: {
   confirmation: Confirmation;
   busy: boolean;
   onClose: () => void;
+  children?: ReactNode;
+  confirmDisabled?: boolean;
 }) {
   const panel = useRef<HTMLElement>(null);
   const previousFocus = useRef(document.activeElement as HTMLElement | null);
@@ -43,8 +47,8 @@ export default function ConfirmDialog({
           }
           if (e.key === "Tab") {
             const buttons = Array.from(
-              panel.current!.querySelectorAll<HTMLButtonElement>(
-                "button:not(:disabled)",
+              panel.current!.querySelectorAll<HTMLElement>(
+                "button:not(:disabled),select:not(:disabled),input:not(:disabled)",
               ),
             );
             const first = buttons[0];
@@ -75,6 +79,7 @@ export default function ConfirmDialog({
         </div>
         <div className="modal-body">
           <p id="confirm-message">{confirmation.message}</p>
+          {children}
           <div className="confirm-actions">
             <button
               className="btn secondary confirm-cancel"
@@ -85,7 +90,7 @@ export default function ConfirmDialog({
             </button>
             <button
               className={"btn " + (confirmation.destructive ? "danger" : "")}
-              disabled={busy}
+              disabled={busy || confirmDisabled}
               onClick={async () => {
                 await confirmation.onConfirm();
                 onClose();
